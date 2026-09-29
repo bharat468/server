@@ -7,6 +7,7 @@ describe('application routes', () => {
   test('reports service health with standard response format', async () => {
     const response = await request(app).get('/api/v1/health');
 
+    
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.status).toBe('ok');
