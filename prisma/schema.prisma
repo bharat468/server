@@ -59,3 +59,16 @@ model OrganizationMember {
   @@unique([organizationId, userId])
   @@map("organization_members")
 }
+
+model Otp {
+  id        String   @id @default(uuid())
+  mobile    String
+  otp       String
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([mobile])
+  @@map("otps")
+}

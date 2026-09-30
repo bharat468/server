@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { ApiResponse } from '../../common/utils/apiResponse.js';
+import authRouter from '../../modules/auth/auth.routes.js';
 
 const router = Router();
 
+// Health Check Endpoint
 router.get('/health', (_request, response) => {
   response.status(200).json(
     new ApiResponse(
@@ -17,5 +19,8 @@ router.get('/health', (_request, response) => {
     )
   );
 });
+
+// Authentication Routes
+router.use('/auth', authRouter);
 
 export default router;
