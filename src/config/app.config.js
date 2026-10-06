@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 
 export function configureApp(app) {
   app.disable('x-powered-by');
@@ -13,6 +14,7 @@ export function configureApp(app) {
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://localhost:3000',
+        'https://clint-two.vercel.app',
       ],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -21,6 +23,7 @@ export function configureApp(app) {
   );
 
   app.use(express.json());
+  app.use(cookieParser());
 
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('combined'));

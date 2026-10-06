@@ -9,9 +9,11 @@ import {
 
 const router = Router();
 
-// Public Authentication Endpoints
+// Public Authentication & Onboarding Endpoints
+router.post('/lookup', authController.lookup);
 router.post('/send-otp', validateRequest(sendOtpSchema), authController.sendOtp);
 router.post('/verify-otp', validateRequest(verifyOtpSchema), authController.verifyOtp);
+router.post('/refresh-token', authController.refreshToken);
 
 // Protected Authentication Endpoints
 router.get('/me', authenticate, authController.getMe);

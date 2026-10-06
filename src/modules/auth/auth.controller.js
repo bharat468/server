@@ -7,6 +7,14 @@ export class AuthController {
     this.service = service;
   }
 
+  lookup = asyncHandler(async (req, res) => {
+    const { mobile } = req.body;
+    const result = await this.service.lookup(mobile);
+    res.status(200).json(
+      new ApiResponse(200, result, 'User lookup completed successfully')
+    );
+  });
+
   sendOtp = asyncHandler(async (req, res) => {
     const { mobile } = req.body;
     const result = await this.service.sendOtp(mobile);
@@ -24,11 +32,36 @@ export class AuthController {
     const { mobile, otp } = req.body;
     const result = await this.service.verifyOtp(mobile, otp);
 
+    // Set secure HTTP-only cookie for refresh token
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
     const message = result.isNewUser
       ? 'Welcome to RENTMATE! Your account has been registered.'
       : 'Authentication successful. Welcome back!';
 
     res.status(200).json(new ApiResponse(200, result, message));
+  });
+
+  refreshToken = asyncHandler(async (req, res) => {
+    const token = req.cookies?.refreshToken || req.body?.refreshToken;
+    const result = await this.service.refreshAccessToken(token);
+
+    // Rotate refresh token in cookie
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json(
+      new ApiResponse(200, result, 'Access token refreshed successfully')
+    );
   });
 
   getMe = asyncHandler(async (req, res) => {
@@ -42,6 +75,7 @@ export class AuthController {
   });
 
   logout = asyncHandler(async (_req, res) => {
+    res.clearCookie('refreshToken');
     res.status(200).json(
       new ApiResponse(200, null, 'Logged out successfully')
     );

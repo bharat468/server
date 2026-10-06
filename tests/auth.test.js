@@ -12,6 +12,15 @@ describe('Authentication Module Integration Tests', () => {
     // Clean up test data before running
     await prisma.otp.deleteMany({ where: { mobile: testMobile } });
     await prisma.user.deleteMany({ where: { mobile: testMobile } });
+
+    // Seed test user to satisfy strict pre-registered login gate
+    await prisma.user.create({
+      data: {
+        mobile: testMobile,
+        name: 'Test Landlord',
+        status: 'ACTIVE',
+      },
+    });
   });
 
   afterAll(async () => {
@@ -28,6 +37,16 @@ describe('Authentication Module Integration Tests', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
+  });
+
+  test('rejects send-otp when mobile is unregistered', async () => {
+    const response = await request(app)
+      .post('/api/v1/auth/send-otp')
+      .send({ mobile: '9999999999' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toContain('Access Denied');
   });
 
   test('successfully generates and stores OTP on valid mobile', async () => {
@@ -72,7 +91,7 @@ describe('Authentication Module Integration Tests', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.token).toBeDefined();
     expect(response.body.data.user.mobile).toBe(testMobile);
-    expect(response.body.data.isNewUser).toBe(true);
+    expect(response.body.data.isNewUser).toBe(false);
 
     authToken = response.body.data.token;
   });

@@ -34,6 +34,13 @@ export class OrganizationRepository {
             user: true,
           },
         },
+        subscriptions: {
+          include: {
+            plan: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
   }

@@ -15,6 +15,17 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum PropertyStatus {
+  VACANT
+  OCCUPIED
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  OVERDUE
+}
+
 model User {
   id                  String               @id @default(uuid())
   mobile              String               @unique
@@ -22,12 +33,18 @@ model User {
   name                String?
   avatar              String?
   status              UserStatus           @default(ACTIVE)
+  isSuperAdmin        Boolean              @default(false)
+  adminRole           String?
+  createdById         String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
   // Relationships
   ownedOrganizations  Organization[]       @relation("OrganizationOwner")
   organizationMembers OrganizationMember[]
+  userRoles           UserRole[]
+  properties          Property[]           @relation("UserProperties")
+  createdProperties   Property[]           @relation("PropertyCreatedBy")
 
   @@map("users")
 }
@@ -41,7 +58,11 @@ model Organization {
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
-  members   OrganizationMember[]
+  members       OrganizationMember[]
+  roles         Role[]
+  userRoles     UserRole[]
+  properties    Property[]
+  subscriptions Subscription[]
 
   @@map("organizations")
 }
@@ -71,4 +92,172 @@ model Otp {
 
   @@index([mobile])
   @@map("otps")
+}
+
+model Role {
+  id             String           @id @default(uuid())
+  name           String
+  slug           String
+  description    String?
+  organizationId String?
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isSystem       Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  permissions    RolePermission[]
+  userRoles      UserRole[]
+
+  @@unique([organizationId, slug])
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  module      String
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId         String
+  role           Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  propertyScope  String[]     @default([]) // Specific property IDs, empty array = full organization access
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([userId, roleId, organizationId])
+  @@map("user_roles")
+}
+
+model Property {
+  id             String         @id @default(uuid())
+  title          String
+  address        String
+  city           String
+  rent           Float
+  bedrooms       Int            @default(1)
+  status         PropertyStatus @default(VACANT)
+  organizationId String?
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerId        String?
+  owner          User?          @relation("UserProperties", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdById    String?
+  createdBy      User?          @relation("PropertyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenants        Tenant[]
+  payments       Payment[]
+
+  @@map("properties")
+}
+
+model Tenant {
+  id          String    @id @default(uuid())
+  name        String
+  email       String
+  phone       String
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  leaseStart  String?
+  leaseEnd    String?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  payments    Payment[]
+
+  @@map("tenants")
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyId  String
+  property    Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amount      Float
+  month       String
+  status      PaymentStatus @default(PENDING)
+  paidOn      DateTime?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+model Plan {
+  id            String         @id @default(uuid())
+  name          String
+  slug          String         @unique
+  description   String?
+  priceMonthly  Float          @default(0)
+  priceYearly   Float          @default(0)
+  maxProperties Int            @default(5)
+  maxTenants    Int            @default(10)
+  maxStaff      Int            @default(2)
+  features      String[]       @default([])
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId         String
+  plan           Plan         @relation(fields: [planId], references: [id], onDelete: Cascade)
+  status         String       @default("ACTIVE")
+  startDate      DateTime     @default(now())
+  endDate        DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("subscriptions")
+}
+
+model SuperAdminRole {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  permissions String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("superadmin_roles")
 }
