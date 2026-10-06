@@ -25,7 +25,7 @@ export class OrganizationController {
 
   getDetails = asyncHandler(async (req, res) => {
     const organizationId = req.params.organizationId || req.params.id;
-    const organization = await organizationService.getOrganizationDetails(organizationId);
+    const organization = await organizationService.getOrganizationDetails(organizationId, req.user);
     res.status(200).json(
       new ApiResponse(200, organization, 'Organization details fetched successfully')
     );
@@ -33,7 +33,7 @@ export class OrganizationController {
 
   listMembers = asyncHandler(async (req, res) => {
     const organizationId = req.params.organizationId || req.params.id;
-    const members = await organizationService.listMembers(organizationId);
+    const members = await organizationService.listMembers(organizationId, req.user);
     res.status(200).json(
       new ApiResponse(200, members, 'Organization members fetched successfully')
     );

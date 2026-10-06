@@ -1,8 +1,9 @@
 import { prisma } from '../../config/database.config.js';
 
 export class PaymentRepository {
-  async list() {
+  async list({ where = {} } = {}) {
     return prisma.payment.findMany({
+      where,
       include: {
         tenant: true,
         property: true,

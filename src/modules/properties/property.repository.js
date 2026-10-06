@@ -1,12 +1,18 @@
 import { prisma } from '../../config/database.config.js';
 
 export class PropertyRepository {
-  async list({ status } = {}) {
+  async list({ status, where = {} } = {}) {
     return prisma.property.findMany({
-      where: status && status !== 'ALL' ? { status } : {},
+      where: {
+        AND: [
+          status && status !== 'ALL' ? { status } : {},
+          where,
+        ],
+      },
       include: {
         tenants: true,
         payments: true,
+        organization: true,
       },
       orderBy: { createdAt: 'desc' },
     });
