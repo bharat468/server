@@ -8,11 +8,10 @@ export const requireAdmin = asyncHandler(async (req, _res, next) => {
     throw new ApiError(401, 'Authentication required');
   }
 
-  // 1. Check if user is a designated SuperAdmin flag or mobile
-  const superAdminMobiles = ['8003953815', '9876543210', process.env.ADMIN_MOBILE].filter(Boolean);
-  if (user.isSuperAdmin || superAdminMobiles.includes(user.mobile)) {
+  // 1. Check if user is a designated SuperAdmin or platform admin role in database
+  if (user.isSuperAdmin || Boolean(user.adminRole)) {
     req.isAdmin = true;
-    req.isSuperAdmin = true;
+    req.isSuperAdmin = Boolean(user.isSuperAdmin || user.adminRole === 'SUPER_ADMIN');
     return next();
   }
 
