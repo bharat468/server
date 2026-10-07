@@ -67,6 +67,26 @@ export class OrganizationController {
     );
   });
 
+  updateMember = asyncHandler(async (req, res) => {
+    const organizationId = req.params.organizationId || req.params.id;
+    const { userId } = req.params;
+    const { roleId, propertyScope, status, name, email } = req.body;
+
+    const members = await organizationService.updateMember({
+      organizationId,
+      userId,
+      roleId,
+      propertyScope,
+      status,
+      name,
+      email,
+    });
+
+    res.status(200).json(
+      new ApiResponse(200, members, 'Member updated successfully')
+    );
+  });
+
   createRole = asyncHandler(async (req, res) => {
     const organizationId = req.params.organizationId || req.params.id;
     const { name, slug, description, permissionKeys } = req.body;
