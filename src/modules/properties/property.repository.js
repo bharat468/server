@@ -13,6 +13,14 @@ export class PropertyRepository {
         tenants: true,
         payments: true,
         organization: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            mobile: true,
+            email: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -24,6 +32,14 @@ export class PropertyRepository {
       include: {
         tenants: true,
         payments: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            mobile: true,
+            email: true,
+          },
+        },
       },
     });
   }
