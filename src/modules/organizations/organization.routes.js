@@ -27,6 +27,12 @@ router.post(
   organizationController.addMember
 );
 
+router.put(
+  '/:organizationId/members/:userId',
+  requirePermission('role.assign'),
+  organizationController.updateMember
+);
+
 router.delete(
   '/:organizationId/members/:userId',
   requirePermission('role.assign'),
