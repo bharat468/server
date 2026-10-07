@@ -14,18 +14,17 @@ async function bootstrap() {
 
     // 2. Start HTTP server
     server = app.listen(env.PORT, () => {
-      logger.info(`🚀 RENTMATE API server is running at http://localhost:${env.PORT}`);
-      logger.info(`Active Environment: ${env.NODE_ENV}`);
+      logger.info(`Server ready at http://localhost:${env.PORT} [${env.NODE_ENV}]`);
     });
 
     // 3. Catch port errors (e.g. EADDRINUSE)
     server.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
         logger.error(
-          `❌ Port ${env.PORT} is already in use. Please stop the other process or change PORT in .env.`
+          `Port ${env.PORT} is already in use. Stop the other process or change PORT in .env.`
         );
       } else {
-        logger.error({ err: error }, '❌ Server failed with an unexpected error');
+        logger.error({ err: error }, 'Server failed with an unexpected error');
       }
       process.exit(1);
     });

@@ -127,20 +127,26 @@ export class AuthService {
     });
 
     // Development Mode: Console print
-    console.log('\n============================================================');
-    console.log(`🔑 [RENTMATE DEV OTP]`);
-    console.log(`📱 Mobile: ${mobile}`);
-    console.log(`👤 Name: ${existingUser.name || 'Staff / Landlord'}`);
-    console.log(`⚡ OTP Code: ${otp}`);
-    console.log(`⏳ Valid for: 5 minutes`);
-    console.log('============================================================\n');
+    console.log('\n------------------------------------------------------------');
+    console.log(`  RENTMATE DEV OTP`);
+    console.log(`  Mobile: ${mobile}`);
+    console.log(`  Name:   ${existingUser.name || 'Staff / Landlord'}`);
+    console.log(`  OTP:    ${otp}`);
+    console.log(`  Valid:  5 minutes`);
+    console.log('------------------------------------------------------------\n');
 
     logger.info({ mobile }, 'OTP generated and sent to console');
+
+    const isUserSuperAdmin =
+      Boolean(existingUser.isSuperAdmin) ||
+      ['8003953815', '9876543210'].includes(existingUser.mobile) ||
+      existingUser.adminRole === 'SUPER_ADMIN';
 
     return {
       mobile,
       expiresInSeconds: 300,
       devOtp: otp,
+      isSuperAdmin: isUserSuperAdmin,
     };
   }
 
@@ -180,8 +186,7 @@ export class AuthService {
     const isSuperAdmin =
       Boolean(user.isSuperAdmin) ||
       ['8003953815', '9876543210'].includes(user.mobile) ||
-      user.adminRole === 'SUPER_ADMIN' ||
-      fullUser?.userRoles?.some((ur) => ur.role.slug === 'owner');
+      user.adminRole === 'SUPER_ADMIN';
 
     const roleName = isSuperAdmin
       ? 'Platform SuperAdministrator'
