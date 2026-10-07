@@ -68,7 +68,6 @@ export class AuthService {
 
     const isUserSuperAdmin =
       Boolean(user.isSuperAdmin) ||
-      ['8003953815', '9876543210'].includes(user.mobile) ||
       user.adminRole === 'SUPER_ADMIN';
 
     const primaryRole = isUserSuperAdmin
@@ -139,7 +138,6 @@ export class AuthService {
 
     const isUserSuperAdmin =
       Boolean(existingUser.isSuperAdmin) ||
-      ['8003953815', '9876543210'].includes(existingUser.mobile) ||
       existingUser.adminRole === 'SUPER_ADMIN';
 
     return {
@@ -185,7 +183,6 @@ export class AuthService {
 
     const isSuperAdmin =
       Boolean(user.isSuperAdmin) ||
-      ['8003953815', '9876543210'].includes(user.mobile) ||
       user.adminRole === 'SUPER_ADMIN';
 
     const roleName = isSuperAdmin
