@@ -10,17 +10,41 @@ export const requirePermission = (permissionKey) => {
       throw new ApiError(401, 'Authentication required');
     }
 
-    // Resolve active organizationId from header, params, query, or body
-    const organizationId =
+    // 1. Resolve active organizationId from header, params, query, or body
+    let organizationId =
       req.headers['x-organization-id'] ||
       req.params.organizationId ||
       req.query.organizationId ||
       req.body.organizationId;
 
+    // Fallback: If not explicitly supplied in header, check user's organizations
+    if (!organizationId) {
+      const defaultOrg = await prisma.organization.findFirst({
+        where: {
+          OR: [
+            { ownerId: user.id },
+            { members: { some: { userId: user.id } } },
+          ],
+        },
+      });
+      if (defaultOrg) {
+        organizationId = defaultOrg.id;
+      }
+    }
+
+    // 2. SuperAdmin Bypass
+    if (user.isSuperAdmin || user.adminRole === 'SUPER_ADMIN') {
+      req.organizationId = organizationId || null;
+      req.isOwner = true;
+      req.isSuperAdmin = true;
+      req.propertyScope = []; // All properties allowed
+      return next();
+    }
+
     if (!organizationId) {
       throw new ApiError(
         400,
-        'Organization context required. Please provide x-organization-id in headers or request parameters.'
+        'Organization context required. Please select an active organization or provide x-organization-id.'
       );
     }
 
@@ -33,7 +57,7 @@ export const requirePermission = (permissionKey) => {
       throw new ApiError(404, 'Organization not found');
     }
 
-    // 1. Direct Owner Bypass (The person who created/owns the company has all permissions)
+    // 3. Direct Owner Bypass (The person who created/owns the company has all permissions)
     if (organization.ownerId === user.id) {
       req.organizationId = organizationId;
       req.isOwner = true;
