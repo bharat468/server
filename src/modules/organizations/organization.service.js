@@ -80,7 +80,7 @@ export class OrganizationService {
       throw new ApiError(404, 'Organization not found');
     }
 
-    if (user && !user.isSuperAdmin && !['8003953815', '9876543210'].includes(user.mobile)) {
+    if (user && !user.isSuperAdmin && user.adminRole !== 'SUPER_ADMIN') {
       const isMember = org.ownerId === user.id || org.members?.some((m) => m.userId === user.id);
       if (!isMember) {
         throw new ApiError(403, 'Access denied: You are not authorized to view this organization.');
@@ -113,7 +113,7 @@ export class OrganizationService {
       throw new ApiError(404, 'Organization not found');
     }
 
-    if (user && !user.isSuperAdmin && !['8003953815', '9876543210'].includes(user.mobile)) {
+    if (user && !user.isSuperAdmin && user.adminRole !== 'SUPER_ADMIN') {
       const isMember = org.ownerId === user.id || org.members?.some((m) => m.userId === user.id);
       if (!isMember) {
         throw new ApiError(403, 'Access denied: You are not authorized to view members of this organization.');
@@ -218,6 +218,46 @@ export class OrganizationService {
         },
       },
     });
+  }
+
+  async updateMember({ organizationId, userId, roleId, propertyScope, status, name, email }) {
+    const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new ApiError(404, 'Organization not found');
+
+    if (name || email || status) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(name ? { name } : {}),
+          ...(email ? { email } : {}),
+          ...(status ? { status } : {}),
+        },
+      });
+    }
+
+    if (roleId) {
+      const role = await prisma.role.findUnique({ where: { id: roleId } });
+      if (role) {
+        await prisma.organizationMember.updateMany({
+          where: { organizationId, userId },
+          data: { role: role.name },
+        });
+
+        await rbacRepository.assignRole({
+          userId,
+          roleId,
+          organizationId,
+          propertyScope: propertyScope || [],
+        });
+      }
+    } else if (propertyScope !== undefined) {
+      await prisma.userRole.updateMany({
+        where: { userId, organizationId },
+        data: { propertyScope },
+      });
+    }
+
+    return this.listMembers(organizationId);
   }
 
   async createCustomRole({ organizationId, name, slug, description, permissionKeys }) {
