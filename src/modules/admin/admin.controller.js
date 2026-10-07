@@ -43,6 +43,21 @@ export class AdminController {
     );
   });
 
+  updateUser = asyncHandler(async (req, res) => {
+    const { name, email, mobile } = req.body;
+    const updated = await adminRepository.updateUserDetails(req.params.id, { name, email, mobile });
+    res.status(200).json(
+      new ApiResponse(200, updated, 'User profile updated successfully')
+    );
+  });
+
+  deleteUser = asyncHandler(async (req, res) => {
+    await adminRepository.deleteUser(req.params.id);
+    res.status(200).json(
+      new ApiResponse(200, null, 'User deleted successfully')
+    );
+  });
+
   updateRole = asyncHandler(async (req, res) => {
     const { roleId, organizationId, propertyScope } = req.body;
     if (!roleId || !organizationId) {
@@ -134,6 +149,23 @@ export class AdminController {
     });
     res.status(200).json(
       new ApiResponse(200, updated, 'Organization subscription updated successfully')
+    );
+  });
+
+  // Dynamic Platform Settings
+  listSettings = asyncHandler(async (_req, res) => {
+    const settings = await adminRepository.listSettings();
+    res.status(200).json(
+      new ApiResponse(200, settings, 'System settings retrieved successfully')
+    );
+  });
+
+  updateSetting = asyncHandler(async (req, res) => {
+    const { key } = req.params;
+    const { value } = req.body;
+    const updated = await adminRepository.updateSetting(key, value);
+    res.status(200).json(
+      new ApiResponse(200, updated, 'Setting updated successfully')
     );
   });
 }

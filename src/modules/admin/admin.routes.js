@@ -11,6 +11,8 @@ router.use(authenticate, requireAdmin);
 router.get('/overview', adminController.getOverview);
 router.get('/users', adminController.listUsers);
 router.post('/users', adminController.createUser);
+router.put('/users/:id', adminController.updateUser);
+router.delete('/users/:id', adminController.deleteUser);
 router.put('/users/:id/status', adminController.updateStatus);
 router.put('/users/:id/role', adminController.updateRole);
 router.put('/users/:id/admin-role', adminController.assignAdminRole);
@@ -24,5 +26,9 @@ router.delete('/roles/:id', adminController.deleteSuperAdminRole);
 // Client Organizations & Subscription / Expiry Controls
 router.get('/organizations', adminController.listOrganizations);
 router.put('/organizations/:id/subscription', adminController.updateOrganizationSubscription);
+
+// Dynamic System Platform Settings
+router.get('/settings', adminController.listSettings);
+router.put('/settings/:key', adminController.updateSetting);
 
 export default router;
