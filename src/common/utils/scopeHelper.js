@@ -17,7 +17,6 @@ export async function getUserScope(user) {
 
   const isSuperAdmin =
     Boolean(user.isSuperAdmin) ||
-    ['8003953815', '9876543210'].includes(user.mobile) ||
     user.adminRole === 'SUPER_ADMIN';
 
   const [ownedOrgs, memberOrgs, userRoles] = await Promise.all([
