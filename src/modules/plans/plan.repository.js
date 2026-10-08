@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database.config.js';
+import { ApiError } from '../../common/errors/apiError.js';
 
 export class PlanRepository {
   async list() {
