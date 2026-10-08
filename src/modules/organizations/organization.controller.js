@@ -43,15 +43,18 @@ export class OrganizationController {
     const organizationId = req.params.organizationId || req.params.id;
     const { mobile, name, email, roleId, roleSlug, propertyScope } = req.body;
 
-    const memberAssignment = await organizationService.addMember({
-      organizationId,
-      mobile,
-      name,
-      email,
-      roleId,
-      roleSlug,
-      propertyScope,
-    });
+    const memberAssignment = await organizationService.addMember(
+      {
+        organizationId,
+        mobile,
+        name,
+        email,
+        roleId,
+        roleSlug,
+        propertyScope,
+      },
+      req.user
+    );
 
     res.status(200).json(
       new ApiResponse(200, memberAssignment, 'Member added with role and scope successfully')

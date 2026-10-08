@@ -135,13 +135,51 @@ export class OrganizationService {
     }));
   }
 
-  async addMember({ organizationId, mobile, name, email, roleId, roleSlug = 'property-manager', propertyScope = [] }) {
-    // 1. Find or auto-create user by mobile
+  async addMember(
+    { organizationId, mobile, name, email, roleId, roleSlug = 'property-manager', propertyScope = [] },
+    currentUser = null
+  ) {
+    // 0. Resolve & Validate target organization
+    let targetOrgId = organizationId;
+    if (!targetOrgId || targetOrgId === 'default') {
+      if (currentUser?.id) {
+        const userOrgs = await this.getUserOrganizations(currentUser.id);
+        if (userOrgs && userOrgs.length > 0) {
+          targetOrgId = userOrgs[0].id;
+        }
+      }
+      if (!targetOrgId || targetOrgId === 'default') {
+        const firstOrg = await prisma.organization.findFirst();
+        if (firstOrg) targetOrgId = firstOrg.id;
+      }
+    }
+
+    const org = await prisma.organization.findUnique({
+      where: { id: targetOrgId },
+    });
+    if (!org) {
+      throw new ApiError(404, 'Organization not found. Please select a valid organization.');
+    }
+    organizationId = org.id;
+
+    // 1. Find or auto-create user by mobile with email safety
     let user = await prisma.user.findUnique({
       where: { mobile },
     });
 
     if (!user) {
+      if (email) {
+        const userByEmail = await prisma.user.findUnique({
+          where: { email },
+        });
+        if (userByEmail) {
+          throw new ApiError(
+            400,
+            `The email address '${email}' is already registered with mobile ${userByEmail.mobile}. Please use a different email or leave it empty.`
+          );
+        }
+      }
+
       user = await prisma.user.create({
         data: {
           mobile,
@@ -150,14 +188,28 @@ export class OrganizationService {
           status: 'ACTIVE',
         },
       });
-    } else if (name || email) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          ...(name ? { name } : {}),
-          ...(email ? { email } : {}),
-        },
-      });
+    } else {
+      if (email && email !== user.email) {
+        const userByEmail = await prisma.user.findUnique({
+          where: { email },
+        });
+        if (userByEmail && userByEmail.id !== user.id) {
+          throw new ApiError(
+            400,
+            `The email address '${email}' is already associated with another user (${userByEmail.mobile}).`
+          );
+        }
+      }
+
+      if (name || email) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            ...(name ? { name } : {}),
+            ...(email ? { email } : {}),
+          },
+        });
+      }
     }
 
     // 2. Find role by ID or slug
@@ -221,10 +273,29 @@ export class OrganizationService {
   }
 
   async updateMember({ organizationId, userId, roleId, propertyScope, status, name, email }) {
-    const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+    let targetOrgId = organizationId;
+    if (!targetOrgId || targetOrgId === 'default') {
+      const firstMembership = await prisma.organizationMember.findFirst({
+        where: { userId },
+      });
+      if (firstMembership) targetOrgId = firstMembership.organizationId;
+    }
+
+    const org = await prisma.organization.findUnique({ where: { id: targetOrgId } });
     if (!org) throw new ApiError(404, 'Organization not found');
+    organizationId = org.id;
 
     if (name || email || status) {
+      if (email) {
+        const userByEmail = await prisma.user.findUnique({ where: { email } });
+        if (userByEmail && userByEmail.id !== userId) {
+          throw new ApiError(
+            400,
+            `The email address '${email}' is already associated with another account.`
+          );
+        }
+      }
+
       await prisma.user.update({
         where: { id: userId },
         data: {
