@@ -51,6 +51,11 @@ describe('Admin, Dynamic Roles & Plans Integration Tests', () => {
       env.JWT_SECRET,
       { expiresIn: '1d' }
     );
+
+    // Clean up any residual test roles from previous test runs
+    await prisma.role.deleteMany({
+      where: { slug: { in: ['site-supervisor', 'chief-site-supervisor'] } },
+    });
   });
 
   afterAll(async () => {

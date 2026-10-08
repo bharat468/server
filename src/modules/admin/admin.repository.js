@@ -274,6 +274,11 @@ export class AdminRepository {
 
   async createSuperAdminRole({ name, slug, description, permissions = [] }) {
     const roleSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const existing = await prisma.superAdminRole.findUnique({ where: { slug: roleSlug } });
+    if (existing) {
+      throw new ApiError(409, `A platform role with slug '${roleSlug}' already exists. Please choose a different name or slug.`);
+    }
+
     return prisma.superAdminRole.create({
       data: {
         name,
@@ -285,6 +290,13 @@ export class AdminRepository {
   }
 
   async updateSuperAdminRole(id, data) {
+    if (data.slug) {
+      const existing = await prisma.superAdminRole.findUnique({ where: { slug: data.slug } });
+      if (existing && existing.id !== id) {
+        throw new ApiError(409, `A platform role with slug '${data.slug}' already exists.`);
+      }
+    }
+
     return prisma.superAdminRole.update({
       where: { id },
       data,

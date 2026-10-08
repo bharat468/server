@@ -44,7 +44,19 @@ export class UserService {
   }
 
   async updateUserProfile(id, updateData) {
-    await this.getUserById(id);
+    const existing = await this.getUserById(id);
+    if (updateData.email && updateData.email !== existing.email) {
+      const emailUser = await this.userRepo.findByEmail(updateData.email);
+      if (emailUser && emailUser.id !== id) {
+        throw new ApiError(409, 'User with this email already exists');
+      }
+    }
+    if (updateData.mobile && updateData.mobile !== existing.mobile) {
+      const mobileUser = await this.userRepo.findByMobile(updateData.mobile);
+      if (mobileUser && mobileUser.id !== id) {
+        throw new ApiError(409, 'User with this mobile number already exists');
+      }
+    }
     return this.userRepo.update(id, updateData);
   }
 

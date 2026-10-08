@@ -20,6 +20,14 @@ export class PlanRepository {
 
   async create(data) {
     const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const existing = await prisma.plan.findUnique({ where: { slug } });
+    if (existing) {
+      throw new ApiError(
+        409,
+        `A SaaS plan with slug '${slug}' already exists. Please choose a different plan name or slug.`
+      );
+    }
+
     return prisma.plan.create({
       data: {
         name: data.name,
@@ -37,10 +45,23 @@ export class PlanRepository {
   }
 
   async update(id, data) {
+    const current = await prisma.plan.findUnique({ where: { id } });
+    if (!current) {
+      throw new ApiError(404, 'Plan not found');
+    }
+
+    if (data.slug && data.slug !== current.slug) {
+      const slugMatch = await prisma.plan.findUnique({ where: { slug: data.slug } });
+      if (slugMatch && slugMatch.id !== id) {
+        throw new ApiError(409, `A SaaS plan with slug '${data.slug}' already exists.`);
+      }
+    }
+
     return prisma.plan.update({
       where: { id },
       data: {
         ...(data.name ? { name: data.name } : {}),
+        ...(data.slug ? { slug: data.slug } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.priceMonthly !== undefined ? { priceMonthly: parseFloat(data.priceMonthly) } : {}),
         ...(data.priceYearly !== undefined ? { priceYearly: parseFloat(data.priceYearly) } : {}),
@@ -54,6 +75,14 @@ export class PlanRepository {
   }
 
   async delete(id) {
+    const subCount = await prisma.subscription.count({ where: { planId: id } });
+    if (subCount > 0) {
+      throw new ApiError(
+        400,
+        `Cannot delete plan because ${subCount} organization(s) are currently subscribed to it. Deactivate the plan instead.`
+      );
+    }
+
     return prisma.plan.delete({
       where: { id },
     });

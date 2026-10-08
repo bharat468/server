@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database.config.js';
+import { ApiError } from '../../common/errors/apiError.js';
 
 export class RbacRepository {
   async listPermissions() {
@@ -52,6 +53,16 @@ export class RbacRepository {
   }
 
   async createRole({ organizationId, name, slug, description, permissionKeys = [] }) {
+    const existing = await prisma.role.findFirst({
+      where: {
+        slug,
+        organizationId: organizationId || null,
+      },
+    });
+    if (existing) {
+      throw new ApiError(409, `A role with identifier '${slug}' already exists in this workspace.`);
+    }
+
     return prisma.$transaction(async (tx) => {
       const role = await tx.role.create({
         data: {
