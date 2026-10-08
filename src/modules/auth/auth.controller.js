@@ -65,10 +65,29 @@ export class AuthController {
   });
 
   getMe = asyncHandler(async (req, res) => {
+    const orgId = req.headers['x-organization-id'] || req.query.organizationId;
+    const { permissions, platformPermissions } = await this.service.calculateUserPermissions(
+      req.user.id,
+      orgId
+    );
+
     res.status(200).json(
       new ApiResponse(
         200,
-        { user: req.user },
+        {
+          user: {
+            id: req.user.id,
+            mobile: req.user.mobile,
+            name: req.user.name,
+            email: req.user.email,
+            status: req.user.status,
+            isSuperAdmin: Boolean(req.user.isSuperAdmin),
+            adminRole: req.user.adminRole,
+            permissions,
+            platformPermissions,
+            createdAt: req.user.createdAt,
+          },
+        },
         'Profile retrieved successfully'
       )
     );

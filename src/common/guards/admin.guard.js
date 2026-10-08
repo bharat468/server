@@ -41,3 +41,40 @@ export const requireAdmin = asyncHandler(async (req, _res, next) => {
 
   throw new ApiError(403, 'Access denied: Admin or Owner privileges required');
 });
+
+export const requirePlatformPermission = (permissionKey) => {
+  return asyncHandler(async (req, _res, next) => {
+    const user = req.user;
+    if (!user) {
+      throw new ApiError(401, 'Authentication required');
+    }
+
+    // Master SuperAdmin has universal platform access
+    if (user.isSuperAdmin || user.adminRole === 'SUPER_ADMIN') {
+      return next();
+    }
+
+    if (!user.adminRole) {
+      throw new ApiError(403, 'Platform administrator privileges required');
+    }
+
+    const saRole = await prisma.superAdminRole.findFirst({
+      where: {
+        OR: [
+          { slug: user.adminRole },
+          { slug: user.adminRole.toLowerCase() },
+          { id: user.adminRole },
+        ],
+      },
+    });
+
+    if (!saRole || !saRole.permissions?.includes(permissionKey)) {
+      throw new ApiError(
+        403,
+        `Forbidden: Your platform administrative role lacks permission '${permissionKey}'`
+      );
+    }
+
+    next();
+  });
+};

@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { authRepository } from './auth.repository.js';
 import { userRepository } from '../users/user.repository.js';
+import { rbacRepository } from '../rbac/rbac.repository.js';
 import { prisma } from '../../config/database.config.js';
 import { env } from '../../config/env.config.js';
 import { ApiError } from '../../common/errors/apiError.js';
@@ -195,6 +196,8 @@ export class AuthService {
       adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
     });
 
+    const { permissions, platformPermissions } = await this.calculateUserPermissions(user.id);
+
     return {
       user: {
         id: user.id,
@@ -205,12 +208,83 @@ export class AuthService {
         role: roleName,
         isSuperAdmin,
         adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
+        permissions,
+        platformPermissions,
         createdAt: user.createdAt,
       },
       token: accessToken,
       refreshToken,
       isNewUser: false,
     };
+  }
+
+  async calculateUserPermissions(userId, organizationId = null) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        ownedOrganizations: true,
+      },
+    });
+
+    if (!user) return { permissions: [], platformPermissions: [] };
+
+    const isSuperAdmin = Boolean(user.isSuperAdmin) || user.adminRole === 'SUPER_ADMIN';
+
+    // 1. Platform Governance Permissions (SuperAdmin Portal)
+    let platformPermissions = [];
+    if (isSuperAdmin) {
+      platformPermissions = ['*'];
+    } else if (user.adminRole) {
+      const saRole = await prisma.superAdminRole.findFirst({
+        where: {
+          OR: [
+            { slug: user.adminRole },
+            { slug: user.adminRole.toLowerCase() },
+            { id: user.adminRole },
+          ],
+        },
+      });
+      platformPermissions = saRole?.permissions || [];
+    }
+
+    // 2. Organization Tenant Permissions (Landlord Workspace)
+    let targetOrgId = organizationId;
+    if (!targetOrgId) {
+      if (user.ownedOrganizations && user.ownedOrganizations.length > 0) {
+        targetOrgId = user.ownedOrganizations[0].id;
+      } else {
+        const firstMembership = await prisma.organizationMember.findFirst({
+          where: { userId },
+        });
+        if (firstMembership) {
+          targetOrgId = firstMembership.organizationId;
+        } else {
+          const firstUserRole = await prisma.userRole.findFirst({
+            where: { userId },
+          });
+          if (firstUserRole) {
+            targetOrgId = firstUserRole.organizationId;
+          }
+        }
+      }
+    }
+
+    let permissions = [];
+    if (isSuperAdmin) {
+      permissions = ['*'];
+    } else if (targetOrgId) {
+      const isOwner = await prisma.organization.findFirst({
+        where: { id: targetOrgId, ownerId: userId },
+      });
+      if (isOwner) {
+        permissions = ['*'];
+      } else {
+        const userRbac = await rbacRepository.getUserPermissionsWithScope(userId, targetOrgId);
+        permissions = userRbac?.permissions || [];
+      }
+    }
+
+    return { permissions, platformPermissions };
   }
 
   async refreshAccessToken(incomingRefreshToken) {
