@@ -78,6 +78,21 @@ router.get(
   requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
   adminController.listOrganizations
 );
+router.post(
+  '/organizations',
+  requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
+  adminController.createOrganization
+);
+router.put(
+  '/organizations/:id',
+  requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
+  adminController.updateOrganization
+);
+router.delete(
+  '/organizations/:id',
+  requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
+  adminController.deleteOrganization
+);
 router.put(
   '/organizations/:id/subscription',
   requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),

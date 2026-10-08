@@ -140,6 +140,39 @@ export class AdminController {
     );
   });
 
+  createOrganization = asyncHandler(async (req, res) => {
+    const { name, slug, ownerMobile, ownerName, ownerEmail, planId } = req.body;
+    const org = await adminRepository.createOrganization({
+      name,
+      slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      ownerMobile,
+      ownerName,
+      ownerEmail,
+      planId,
+    });
+    res.status(201).json(
+      new ApiResponse(201, org, 'Organization created successfully with owner and plan')
+    );
+  });
+
+  updateOrganization = asyncHandler(async (req, res) => {
+    const { name, slug } = req.body;
+    const updated = await adminRepository.updateOrganization(req.params.id, {
+      name,
+      slug,
+    });
+    res.status(200).json(
+      new ApiResponse(200, updated, 'Organization updated successfully')
+    );
+  });
+
+  deleteOrganization = asyncHandler(async (req, res) => {
+    await adminRepository.deleteOrganization(req.params.id);
+    res.status(200).json(
+      new ApiResponse(200, null, 'Organization deleted successfully')
+    );
+  });
+
   updateOrganizationSubscription = asyncHandler(async (req, res) => {
     const { planId, expiresAt, status } = req.body;
     const updated = await adminRepository.updateOrganizationSubscription(req.params.id, {

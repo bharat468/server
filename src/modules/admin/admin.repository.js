@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database.config.js';
+import { ApiError } from '../../common/errors/apiError.js';
 
 export class AdminRepository {
   async listUsers() {
@@ -313,7 +314,137 @@ export class AdminRepository {
             }
           : null,
         createdAt: org.createdAt,
+        updatedAt: org.updatedAt,
       };
+    });
+  }
+
+  async createOrganization({ name, slug, ownerMobile, ownerName, ownerEmail, planId }) {
+    const existing = await prisma.organization.findUnique({ where: { slug } });
+    if (existing) {
+      throw new ApiError(409, `An organization with slug '${slug}' already exists. Please choose a different slug.`);
+    }
+
+    // 1. Find or create owner user
+    let owner = await prisma.user.findUnique({ where: { mobile: ownerMobile } });
+    if (!owner) {
+      if (ownerEmail) {
+        const userByEmail = await prisma.user.findUnique({ where: { email: ownerEmail } });
+        if (userByEmail) {
+          throw new ApiError(
+            400,
+            `The email '${ownerEmail}' is already registered with mobile ${userByEmail.mobile}.`
+          );
+        }
+      }
+      owner = await prisma.user.create({
+        data: {
+          mobile: ownerMobile,
+          name: ownerName || null,
+          email: ownerEmail || null,
+          status: 'ACTIVE',
+        },
+      });
+    }
+
+    return prisma.$transaction(async (tx) => {
+      // 2. Create organization
+      const org = await tx.organization.create({
+        data: {
+          name,
+          slug,
+          ownerId: owner.id,
+        },
+        include: {
+          owner: {
+            select: { id: true, name: true, mobile: true, email: true },
+          },
+        },
+      });
+
+      // 3. Add owner to organization members
+      await tx.organizationMember.create({
+        data: {
+          organizationId: org.id,
+          userId: owner.id,
+          role: 'OWNER',
+        },
+      });
+
+      // 4. Assign Owner system role
+      const ownerRole = await tx.role.findFirst({
+        where: { slug: 'owner', organizationId: null },
+      });
+      if (ownerRole) {
+        await tx.userRole.create({
+          data: {
+            userId: owner.id,
+            roleId: ownerRole.id,
+            organizationId: org.id,
+            propertyScope: [],
+          },
+        });
+      }
+
+      // 5. Assign SaaS plan subscription
+      let targetPlanId = planId;
+      if (!targetPlanId) {
+        const defaultPlan = await tx.plan.findFirst({ where: { isActive: true } });
+        if (defaultPlan) targetPlanId = defaultPlan.id;
+      }
+
+      if (targetPlanId) {
+        const oneYearExpiry = new Date();
+        oneYearExpiry.setFullYear(oneYearExpiry.getFullYear() + 1);
+        await tx.subscription.create({
+          data: {
+            organizationId: org.id,
+            planId: targetPlanId,
+            status: 'ACTIVE',
+            expiresAt: oneYearExpiry,
+          },
+        });
+      }
+
+      return org;
+    });
+  }
+
+  async updateOrganization(id, { name, slug }) {
+    const org = await prisma.organization.findUnique({ where: { id } });
+    if (!org) {
+      throw new ApiError(404, 'Organization not found.');
+    }
+
+    if (slug && slug !== org.slug) {
+      const existing = await prisma.organization.findUnique({ where: { slug } });
+      if (existing && existing.id !== id) {
+        throw new ApiError(409, `An organization with slug '${slug}' already exists.`);
+      }
+    }
+
+    return prisma.organization.update({
+      where: { id },
+      data: {
+        ...(name ? { name } : {}),
+        ...(slug ? { slug } : {}),
+      },
+      include: {
+        owner: {
+          select: { id: true, name: true, mobile: true, email: true },
+        },
+      },
+    });
+  }
+
+  async deleteOrganization(id) {
+    const org = await prisma.organization.findUnique({ where: { id } });
+    if (!org) {
+      throw new ApiError(404, 'Organization not found.');
+    }
+
+    return prisma.organization.delete({
+      where: { id },
     });
   }
 
