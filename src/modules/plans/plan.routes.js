@@ -5,9 +5,9 @@ import { requireAdmin } from '../../common/guards/admin.guard.js';
 
 const router = Router();
 
-// Everyone authenticated can view available plans
-router.get('/', authenticate, planController.list);
-router.get('/:id', authenticate, planController.get);
+// Public can view available plans for marketing website & onboarding
+router.get('/', planController.list);
+router.get('/:id', planController.get);
 
 // Only Admin/Owner can manage plans
 router.post('/', authenticate, requireAdmin, planController.create);
