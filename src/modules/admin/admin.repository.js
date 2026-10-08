@@ -26,6 +26,15 @@ export class AdminRepository {
       // 1. Create or retrieve user by mobile
       let user = await tx.user.findUnique({ where: { mobile } });
       if (!user) {
+        if (email) {
+          const userWithEmail = await tx.user.findUnique({ where: { email } });
+          if (userWithEmail) {
+            throw new ApiError(
+              409,
+              `The email address '${email}' is already registered with mobile number ${userWithEmail.mobile}. Please use a different email or provide their registered mobile number.`
+            );
+          }
+        }
         user = await tx.user.create({
           data: {
             mobile,
@@ -35,6 +44,15 @@ export class AdminRepository {
           },
         });
       } else {
+        if (email && email !== user.email) {
+          const userWithEmail = await tx.user.findUnique({ where: { email } });
+          if (userWithEmail && userWithEmail.id !== user.id) {
+            throw new ApiError(
+              409,
+              `The email address '${email}' is already in use by another user (${userWithEmail.mobile}).`
+            );
+          }
+        }
         user = await tx.user.update({
           where: { id: user.id },
           data: {
@@ -113,6 +131,25 @@ export class AdminRepository {
   }
 
   async updateUserDetails(userId, { name, email, mobile }) {
+    if (email) {
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing && existing.id !== userId) {
+        throw new ApiError(
+          409,
+          `The email address '${email}' is already in use by another user (${existing.mobile}).`
+        );
+      }
+    }
+    if (mobile) {
+      const existing = await prisma.user.findUnique({ where: { mobile } });
+      if (existing && existing.id !== userId) {
+        throw new ApiError(
+          409,
+          `The mobile number '${mobile}' is already registered to another user.`
+        );
+      }
+    }
+
     return prisma.user.update({
       where: { id: userId },
       data: {
@@ -332,7 +369,7 @@ export class AdminRepository {
         const userByEmail = await prisma.user.findUnique({ where: { email: ownerEmail } });
         if (userByEmail) {
           throw new ApiError(
-            400,
+            409,
             `The email '${ownerEmail}' is already registered with mobile ${userByEmail.mobile}.`
           );
         }
@@ -345,6 +382,23 @@ export class AdminRepository {
           status: 'ACTIVE',
         },
       });
+    } else {
+      if (ownerEmail && owner.email !== ownerEmail) {
+        const userByEmail = await prisma.user.findUnique({ where: { email: ownerEmail } });
+        if (userByEmail && userByEmail.id !== owner.id) {
+          throw new ApiError(
+            409,
+            `The email '${ownerEmail}' is already registered with another user (${userByEmail.mobile}).`
+          );
+        }
+        owner = await prisma.user.update({
+          where: { id: owner.id },
+          data: {
+            email: ownerEmail,
+            ...(ownerName && !owner.name ? { name: ownerName } : {}),
+          },
+        });
+      }
     }
 
     return prisma.$transaction(async (tx) => {

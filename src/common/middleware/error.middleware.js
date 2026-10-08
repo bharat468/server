@@ -4,43 +4,69 @@ export const errorHandler = (err, _req, res, _next) => {
   let error = err;
 
   if (!(error instanceof ApiError)) {
-    // Intercept Prisma Database Errors gracefully
-    if (error?.name === 'PrismaClientKnownRequestError' || error?.code?.startsWith?.('P')) {
-      if (error.code === 'P2002') {
-        const target = error.meta?.target;
-        const fieldName = Array.isArray(target) ? target.join(', ') : target || 'field';
-        error = new ApiError(
-          409,
-          `A record with this ${fieldName} already exists. Please choose a different ${fieldName}.`,
-          [],
-          err.stack
-        );
-      } else if (error.code === 'P2003') {
-        error = new ApiError(
-          400,
-          'Referenced relationship or organization record was not found.',
-          [],
-          err.stack
-        );
-      } else if (error.code === 'P2025') {
-        error = new ApiError(
-          404,
-          'The requested record does not exist or has already been deleted.',
-          [],
-          err.stack
-        );
+    const errorMsg = String(error?.message || '');
+    const isPrismaKnown =
+      error?.name === 'PrismaClientKnownRequestError' ||
+      error?.constructor?.name === 'PrismaClientKnownRequestError' ||
+      (typeof error?.code === 'string' && error.code.startsWith('P'));
+
+    const isPrismaUnique =
+      error?.code === 'P2002' ||
+      errorMsg.includes('Unique constraint failed');
+
+    const isPrismaForeignKey =
+      error?.code === 'P2003' ||
+      errorMsg.includes('Foreign key constraint failed');
+
+    const isPrismaNotFound =
+      error?.code === 'P2025' ||
+      errorMsg.includes('Record to update not found') ||
+      errorMsg.includes('Record to delete does not exist') ||
+      errorMsg.includes('does not exist');
+
+    const isPrismaValidation =
+      error?.name === 'PrismaClientValidationError' ||
+      errorMsg.includes('PrismaClientValidationError') ||
+      (errorMsg.includes('Invalid `prisma.') && errorMsg.includes('invocation:'));
+
+    if (isPrismaUnique) {
+      let fieldName = 'record';
+      const target = error.meta?.target;
+      if (Array.isArray(target)) {
+        fieldName = target.join(', ');
+      } else if (typeof target === 'string') {
+        fieldName = target;
       } else {
-        error = new ApiError(
-          400,
-          'Database operation could not be processed with the provided parameters.',
-          [],
-          err.stack
-        );
+        const match = errorMsg.match(/fields:\s*\(`?([^`\)]+)`?\)/i);
+        if (match && match[1]) {
+          fieldName = match[1].replace(/[`"']/g, '').trim();
+        }
       }
-    } else if (error?.name === 'PrismaClientValidationError') {
+
+      error = new ApiError(
+        409,
+        `A record with this ${fieldName} already exists. Please provide a different ${fieldName}.`,
+        [],
+        err.stack
+      );
+    } else if (isPrismaForeignKey) {
       error = new ApiError(
         400,
-        'Invalid data payload provided for database operation.',
+        'Referenced relationship or organization record was not found.',
+        [],
+        err.stack
+      );
+    } else if (isPrismaNotFound) {
+      error = new ApiError(
+        404,
+        'The requested record does not exist or has already been deleted.',
+        [],
+        err.stack
+      );
+    } else if (isPrismaValidation || isPrismaKnown || errorMsg.includes('prisma.')) {
+      error = new ApiError(
+        400,
+        'Invalid parameters provided for database operation.',
         [],
         err.stack
       );
