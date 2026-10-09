@@ -111,4 +111,21 @@ router.put(
   adminController.updateSetting
 );
 
+// Platform Oversight: Properties, Leases, Maintenance
+router.get(
+  '/properties',
+  requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
+  adminController.listProperties
+);
+router.get(
+  '/leases',
+  requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
+  adminController.listLeases
+);
+router.get(
+  '/maintenance',
+  requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
+  adminController.listMaintenance
+);
+
 export default router;

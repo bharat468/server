@@ -542,6 +542,54 @@ export class AdminRepository {
       });
     }
   }
+
+  async listAllProperties() {
+    return prisma.property.findMany({
+      include: {
+        organization: true,
+        owner: {
+          select: { id: true, name: true, mobile: true, email: true },
+        },
+        units: true,
+        leases: {
+          where: { status: 'ACTIVE' },
+          select: { id: true, status: true, monthlyRent: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async listAllLeases() {
+    return prisma.lease.findMany({
+      include: {
+        property: true,
+        unit: true,
+        tenant: {
+          select: { id: true, name: true, mobile: true, email: true },
+        },
+        rentRule: true,
+        schedules: {
+          take: 6,
+          orderBy: { dueDate: 'desc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async listAllMaintenance() {
+    return prisma.maintenanceRequest.findMany({
+      include: {
+        property: true,
+        unit: true,
+        tenant: {
+          select: { id: true, name: true, mobile: true, email: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }
 
 export const adminRepository = new AdminRepository();

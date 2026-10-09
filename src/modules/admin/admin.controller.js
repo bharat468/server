@@ -201,6 +201,27 @@ export class AdminController {
       new ApiResponse(200, updated, 'Setting updated successfully')
     );
   });
+
+  listProperties = asyncHandler(async (_req, res) => {
+    const properties = await adminRepository.listAllProperties();
+    res.status(200).json(
+      new ApiResponse(200, properties, 'Platform properties retrieved successfully')
+    );
+  });
+
+  listLeases = asyncHandler(async (_req, res) => {
+    const leases = await adminRepository.listAllLeases();
+    res.status(200).json(
+      new ApiResponse(200, leases, 'Platform leases retrieved successfully')
+    );
+  });
+
+  listMaintenance = asyncHandler(async (_req, res) => {
+    const tickets = await adminRepository.listAllMaintenance();
+    res.status(200).json(
+      new ApiResponse(200, tickets, 'Platform maintenance tickets retrieved successfully')
+    );
+  });
 }
 
 export const adminController = new AdminController();
