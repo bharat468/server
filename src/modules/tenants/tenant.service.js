@@ -1,5 +1,6 @@
 import { tenantRepository } from './tenant.repository.js';
 import { propertyRepository } from '../properties/property.repository.js';
+import { prisma } from '../../config/database.config.js';
 import { ApiError } from '../../common/errors/apiError.js';
 import { getUserScope } from '../../common/utils/scopeHelper.js';
 
@@ -88,6 +89,62 @@ export class TenantService {
 
     if (payload.propertyId) {
       await propertyRepository.update(payload.propertyId, { status: 'OCCUPIED' });
+
+      try {
+        let tenantUser = null;
+        if (payload.phone) {
+          tenantUser = await prisma.user.findUnique({ where: { mobile: payload.phone } });
+          if (!tenantUser) {
+            tenantUser = await prisma.user.create({
+              data: {
+                mobile: payload.phone,
+                name: payload.name || 'Tenant',
+                email: payload.email || null,
+                status: 'ACTIVE',
+              },
+            });
+          }
+        }
+
+        if (tenantUser) {
+          const property = await propertyRepository.findById(payload.propertyId);
+          let unit = await prisma.unit.findFirst({ where: { propertyId: payload.propertyId } });
+          if (!unit) {
+            unit = await prisma.unit.create({
+              data: {
+                propertyId: payload.propertyId,
+                unitNumber: 'Unit 1',
+                rentAmount: property?.rent || 15000,
+                status: 'OCCUPIED',
+              },
+            });
+          }
+
+          await prisma.lease.create({
+            data: {
+              propertyId: payload.propertyId,
+              unitId: unit.id,
+              tenantId: tenantUser.id,
+              monthlyRent: property?.rent || 15000,
+              securityDeposit: (property?.rent || 15000) * 2,
+              startDate: payload.leaseStart ? new Date(payload.leaseStart) : new Date(),
+              endDate: payload.leaseEnd ? new Date(payload.leaseEnd) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+              status: 'ACTIVE',
+              rentRule: {
+                create: {
+                  dueDay: 5,
+                  graceDays: 3,
+                  penaltyType: 'PER_DAY',
+                  penaltyAmount: 100,
+                  maxPenaltyCap: 2000,
+                },
+              },
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Failed to create lease record for tenant', err);
+      }
     }
 
     return tenant;
