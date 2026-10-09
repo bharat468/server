@@ -8,6 +8,11 @@ import tenantRouter from '../../modules/tenants/tenant.routes.js';
 import paymentRouter from '../../modules/payments/payment.routes.js';
 import adminRouter from '../../modules/admin/admin.routes.js';
 import planRouter from '../../modules/plans/plan.routes.js';
+import unitRouter from '../../modules/units/unit.routes.js';
+import listingRouter from '../../modules/listings/listing.routes.js';
+import applicationRouter from '../../modules/applications/application.routes.js';
+import leaseRouter from '../../modules/leases/lease.routes.js';
+import maintenanceRouter from '../../modules/maintenance/maintenance.routes.js';
 
 const router = Router();
 
@@ -37,7 +42,24 @@ router.use('/organizations', organizationRouter);
 router.use('/roles', rbacRouter);
 
 // Properties Management Routes (/api/v1/properties)
+
+
 router.use('/properties', propertyRouter);
+
+// Multi-Unit Management Routes (/api/v1/units)
+router.use('/units', unitRouter);
+
+// Rental Marketplace & Listings Routes (/api/v1/listings)
+router.use('/listings', listingRouter);
+
+// Rental Applications & Lease Onboarding (/api/v1/applications)
+router.use('/applications', applicationRouter);
+
+// Leases, Rent Rules & Penalty Schedules (/api/v1/leases)
+router.use('/leases', leaseRouter);
+
+// Maintenance Requests & Complaints (/api/v1/maintenance)
+router.use('/maintenance', maintenanceRouter);
 
 // Tenants Management Routes (/api/v1/tenants)
 router.use('/tenants', tenantRouter);
