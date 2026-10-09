@@ -26,6 +26,58 @@ enum PaymentStatus {
   OVERDUE
 }
 
+enum UnitStatus {
+  VACANT
+  LISTED
+  APPLICATION_PENDING
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum LeaseStatus {
+  DRAFT
+  ACTIVE
+  EXPIRING
+  EXPIRED
+  TERMINATED
+}
+
+enum ScheduleStatus {
+  UPCOMING
+  DUE
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+enum MaintenanceStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 model User {
   id                  String               @id @default(uuid())
   mobile              String               @unique
@@ -40,11 +92,16 @@ model User {
   updatedAt           DateTime             @updatedAt
 
   // Relationships
-  ownedOrganizations  Organization[]       @relation("OrganizationOwner")
-  organizationMembers OrganizationMember[]
-  userRoles           UserRole[]
-  properties          Property[]           @relation("UserProperties")
-  createdProperties   Property[]           @relation("PropertyCreatedBy")
+  ownedOrganizations         Organization[]       @relation("OrganizationOwner")
+  organizationMembers        OrganizationMember[]
+  userRoles                  UserRole[]
+  properties                 Property[]           @relation("UserProperties")
+  createdProperties          Property[]           @relation("PropertyCreatedBy")
+  applications               RentalApplication[]
+  tenantLeases               Lease[]              @relation("TenantLeases")
+  tenantMaintenanceRequests  MaintenanceRequest[] @relation("TenantMaintenanceRequests")
+  staffAssignedRequests      MaintenanceRequest[] @relation("StaffAssignedRequests")
+  actorAuditLogs             AuditLog[]           @relation("ActorAuditLogs")
 
   @@map("users")
 }
@@ -171,8 +228,12 @@ model Property {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  tenants        Tenant[]
-  payments       Payment[]
+  tenants             Tenant[]
+  payments            Payment[]
+  units               Unit[]
+  listings            RentalListing[]
+  leases              Lease[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@map("properties")
 }
@@ -261,3 +322,184 @@ model SuperAdminRole {
 
   @@map("superadmin_roles")
 }
+
+model Unit {
+  id             String         @id @default(uuid())
+  propertyId     String
+  property       Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unitNumber     String
+  floor          Int            @default(1)
+  type           String         @default("FLAT_2BHK")
+  areaSqFt       Float?
+  rentAmount     Float
+  depositAmount  Float          @default(0)
+  furnishing     String         @default("SEMI_FURNISHED")
+  status         UnitStatus     @default(VACANT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  listings            RentalListing[]
+  leases              Lease[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@unique([propertyId, unitNumber])
+  @@map("units")
+}
+
+model RentalListing {
+  id              String         @id @default(uuid())
+  unitId          String
+  unit            Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  propertyId      String
+  property        Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  category        String         @default("RESIDENTIAL")
+  monthlyRent     Float
+  securityDeposit Float
+  furnishing      String?
+  availableFrom   DateTime?
+  amenities       String[]       @default([])
+  photos          String[]       @default([])
+  isPublished     Boolean        @default(true)
+  status          ListingStatus  @default(PUBLISHED)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  applications    RentalApplication[]
+
+  @@map("rental_listings")
+}
+
+model RentalApplication {
+  id              String            @id @default(uuid())
+  listingId       String
+  listing         RentalListing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  applicantId     String
+  applicant       User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String
+  occupation      String?
+  message         String?
+  proposedMoveIn  DateTime?
+  status          ApplicationStatus @default(PENDING)
+  reviewedAt      DateTime?
+  reviewerNotes   String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  lease           Lease?
+
+  @@map("rental_applications")
+}
+
+model Lease {
+  id              String             @id @default(uuid())
+  propertyId      String
+  property        Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unitId          String
+  unit            Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  tenantId        String
+  tenant          User               @relation("TenantLeases", fields: [tenantId], references: [id], onDelete: Cascade)
+  applicationId   String?            @unique
+  application     RentalApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  startDate       DateTime
+  endDate         DateTime
+  monthlyRent     Float
+  securityDeposit Float
+  depositPaid     Float              @default(0)
+  depositStatus   String             @default("PENDING")
+  status          LeaseStatus        @default(ACTIVE)
+  terms           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  rentRule        RentRule?
+  schedules       RentSchedule[]
+
+  @@map("leases")
+}
+
+model RentRule {
+  id             String         @id @default(uuid())
+  leaseId        String         @unique
+  lease          Lease          @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  frequency      String         @default("MONTHLY")
+  dueDay         Int            @default(5)
+  graceDays      Int            @default(3)
+  penaltyType    String         @default("PER_DAY")
+  penaltyAmount  Float          @default(100)
+  maxPenaltyCap  Float          @default(2000)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("rent_rules")
+}
+
+model RentSchedule {
+  id             String         @id @default(uuid())
+  leaseId        String
+  lease          Lease          @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  period         String
+  dueDate        DateTime
+  amount         Float
+  paidAmount     Float          @default(0)
+  penaltyAmount  Float          @default(0)
+  status         ScheduleStatus @default(UPCOMING)
+  paidOn         DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("rent_schedules")
+}
+
+model MaintenanceRequest {
+  id              String              @id @default(uuid())
+  propertyId      String
+  property        Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unitId          String?
+  unit            Unit?               @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  tenantId        String
+  tenant          User                @relation("TenantMaintenanceRequests", fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedStaffId String?
+  assignedStaff   User?               @relation("StaffAssignedRequests", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  title           String
+  description     String
+  category        String              @default("PLUMBING")
+  priority        MaintenancePriority @default(MEDIUM)
+  status          MaintenanceStatus   @default(OPEN)
+  cost            Float               @default(0)
+  notes           String?
+  resolvedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@map("maintenance_requests")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  actorId    String?
+  actor      User?     @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  category    String   @default("GENERAL")
+  description String?
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@map("system_settings")
+}
+

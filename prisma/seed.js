@@ -327,6 +327,186 @@ async function main() {
     console.log('✓ Seeded 4 demo payments for September and October 2026');
   }
 
+  // 6b. Seed Units, Leases & Maintenance Tickets for Platform Oversight
+  let unit1 = await prisma.unit.findFirst({ where: { propertyId: prop1.id, unitNumber: '101' } });
+  if (!unit1) {
+    unit1 = await prisma.unit.create({
+      data: {
+        propertyId: prop1.id,
+        unitNumber: '101',
+        floor: 1,
+        type: 'FLAT_2BHK',
+        rentAmount: 32000,
+        depositAmount: 64000,
+        furnishing: 'SEMI_FURNISHED',
+        status: 'OCCUPIED',
+      },
+    });
+  }
+
+  let unit2 = await prisma.unit.findFirst({ where: { propertyId: prop1.id, unitNumber: '102' } });
+  if (!unit2) {
+    unit2 = await prisma.unit.create({
+      data: {
+        propertyId: prop1.id,
+        unitNumber: '102',
+        floor: 1,
+        type: 'FLAT_2BHK',
+        rentAmount: 30000,
+        depositAmount: 60000,
+        furnishing: 'UNFURNISHED',
+        status: 'VACANT',
+      },
+    });
+  }
+
+  let unit3 = await prisma.unit.findFirst({ where: { propertyId: prop2.id, unitNumber: 'Wing-A' } });
+  if (!unit3) {
+    unit3 = await prisma.unit.create({
+      data: {
+        propertyId: prop2.id,
+        unitNumber: 'Wing-A',
+        floor: 1,
+        type: 'FLAT_3BHK',
+        rentAmount: 48000,
+        depositAmount: 96000,
+        furnishing: 'FULLY_FURNISHED',
+        status: 'OCCUPIED',
+      },
+    });
+  }
+
+  // 6b. Ensure Tenant User accounts exist for Leases & Maintenance Tickets
+  const tenantUser1 = await prisma.user.upsert({
+    where: { mobile: '9876543211' },
+    update: { name: 'Rahul Sharma', email: 'rahul.sharma@example.com', status: 'ACTIVE' },
+    create: {
+      mobile: '9876543211',
+      name: 'Rahul Sharma',
+      email: 'rahul.sharma@example.com',
+      status: 'ACTIVE',
+    },
+  });
+
+  const tenantUser2 = await prisma.user.upsert({
+    where: { mobile: '9876543212' },
+    update: { name: 'Priya Patel', email: 'priya.patel@example.com', status: 'ACTIVE' },
+    create: {
+      mobile: '9876543212',
+      name: 'Priya Patel',
+      email: 'priya.patel@example.com',
+      status: 'ACTIVE',
+    },
+  });
+
+  // Active Leases
+  let lease1 = await prisma.lease.findFirst({ where: { propertyId: prop1.id, tenantId: tenantUser1.id } });
+  if (!lease1) {
+    lease1 = await prisma.lease.create({
+      data: {
+        propertyId: prop1.id,
+        unitId: unit1.id,
+        tenantId: tenantUser1.id,
+        monthlyRent: 32000,
+        securityDeposit: 64000,
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-12-31'),
+        status: 'ACTIVE',
+        rentRule: {
+          create: {
+            dueDay: 5,
+            graceDays: 3,
+            penaltyType: 'PER_DAY',
+            penaltyAmount: 100,
+            maxPenaltyCap: 2000,
+          },
+        },
+      },
+    });
+  }
+
+  let lease2 = await prisma.lease.findFirst({ where: { propertyId: prop2.id, tenantId: tenantUser2.id } });
+  if (!lease2) {
+    lease2 = await prisma.lease.create({
+      data: {
+        propertyId: prop2.id,
+        unitId: unit3.id,
+        tenantId: tenantUser2.id,
+        monthlyRent: 48000,
+        securityDeposit: 96000,
+        startDate: new Date('2026-02-01'),
+        endDate: new Date('2027-01-31'),
+        status: 'ACTIVE',
+        rentRule: {
+          create: {
+            dueDay: 1,
+            graceDays: 5,
+            penaltyType: 'PER_DAY',
+            penaltyAmount: 150,
+            maxPenaltyCap: 3000,
+          },
+        },
+      },
+    });
+  }
+  console.log('✓ Seeded demo Units and active Leases with Rent Rules');
+
+  // Maintenance Tickets
+  const existingTickets = await prisma.maintenanceRequest.count();
+  if (existingTickets === 0) {
+    await prisma.maintenanceRequest.createMany({
+      data: [
+        {
+          propertyId: prop1.id,
+          unitId: unit1.id,
+          tenantId: tenantUser1.id,
+          title: 'Bathroom shower mixer leakage',
+          description: 'Water continuously dripping from the hot water mixer in master washroom.',
+          category: 'PLUMBING',
+          priority: 'HIGH',
+          status: 'IN_PROGRESS',
+          cost: 1200,
+          notes: 'Plumber assigned, replacement valve ordered.',
+        },
+        {
+          propertyId: prop2.id,
+          unitId: unit3.id,
+          tenantId: tenantUser2.id,
+          title: 'Power trip on main AC circuit breaker',
+          description: 'Breaker flips whenever both living room and master bedroom ACs are switched on simultaneously.',
+          category: 'ELECTRICAL',
+          priority: 'URGENT',
+          status: 'OPEN',
+          cost: 0,
+        },
+        {
+          propertyId: prop1.id,
+          unitId: unit1.id,
+          tenantId: tenantUser1.id,
+          title: 'Balcony sliding window lock alignment',
+          description: 'Sliding lock latch getting stuck when closing completely.',
+          category: 'CARPENTRY',
+          priority: 'LOW',
+          status: 'RESOLVED',
+          cost: 450,
+          notes: 'Lock adjusted and lubricated.',
+        },
+        {
+          propertyId: prop3.id,
+          unitId: null,
+          tenantId: tenantUser1.id,
+          title: 'Touch-up paint required before new tenant move-in',
+          description: 'Entry foyer and hallway wall need touch-up paint.',
+          category: 'PAINTING',
+          priority: 'MEDIUM',
+          status: 'OPEN',
+          cost: 0,
+        },
+      ],
+    });
+    console.log('✓ Seeded 4 demo maintenance complaints and repair tickets');
+  }
+
   // 7. Seed Default SaaS Plans
   const plans = [
     {
