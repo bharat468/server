@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { rbacRepository } from './rbac.repository.js';
 import { authenticate } from '../../common/middleware/auth.middleware.js';
+import { requirePermission } from '../../common/guards/rbac.guard.js';
 import { ApiResponse } from '../../common/utils/apiResponse.js';
 import { asyncHandler } from '../../common/utils/asyncHandler.js';
 import { ApiError } from '../../common/errors/apiError.js';
@@ -35,6 +36,7 @@ router.get(
 // Create Dynamic Custom Role
 router.post(
   '/',
+  requirePermission('role.create'),
   asyncHandler(async (req, res) => {
     const { name, slug, description, permissionKeys, organizationId } = req.body;
     if (!name) {
@@ -57,6 +59,7 @@ router.post(
 // Update Role
 router.put(
   '/:id',
+  requirePermission('role.create'),
   asyncHandler(async (req, res) => {
     const { name, description, permissionKeys } = req.body;
     const updated = await rbacRepository.updateRole(req.params.id, {
@@ -73,6 +76,7 @@ router.put(
 // Delete Custom Role
 router.delete(
   '/:id',
+  requirePermission('role.create'),
   asyncHandler(async (req, res) => {
     await rbacRepository.deleteRole(req.params.id);
     res.status(200).json(

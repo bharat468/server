@@ -104,6 +104,9 @@ export class RbacRepository {
       if (!existing) {
         throw new Error('Role not found');
       }
+      if (existing.isSystem) {
+        throw new Error('System roles cannot be modified');
+      }
 
       await tx.role.update({
         where: { id },
