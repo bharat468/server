@@ -6,6 +6,7 @@ import { prisma } from '../../config/database.config.js';
 import { env } from '../../config/env.config.js';
 import { ApiError } from '../../common/errors/apiError.js';
 import { logger } from '../../common/logger/logger.js';
+import { systemSettingsService } from '../admin/systemSettings.service.js';
 
 export class AuthService {
   constructor(authRepo = authRepository, userRepo = userRepository) {
@@ -26,8 +27,11 @@ export class AuthService {
       ...additionalClaims,
     };
 
+    const accessMinutes = systemSettingsService.getCachedNumber('jwt_access_expiry_minutes', 15);
+    const refreshDays = systemSettingsService.getCachedNumber('jwt_refresh_expiry_days', 7);
+
     const accessToken = jwt.sign(payload, env.JWT_SECRET, {
-      expiresIn: '15m',
+      expiresIn: `${accessMinutes}m`,
     });
 
     const refreshToken = jwt.sign(
@@ -37,7 +41,7 @@ export class AuthService {
         jti: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
       },
       env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: `${refreshDays}d` }
     );
 
     return { accessToken, refreshToken };
@@ -123,7 +127,8 @@ export class AuthService {
     }
 
     const otp = this.generateOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes TTL
+    const otpTtlMinutes = systemSettingsService.getCachedNumber('otp_expiry_minutes', 5);
+    const expiresAt = new Date(Date.now() + otpTtlMinutes * 60 * 1000); // Dynamic TTL from settings
 
     await this.authRepo.createOtp({
       mobile,
@@ -137,7 +142,7 @@ export class AuthService {
     console.log(`  Mobile: ${mobile}`);
     console.log(`  Name:   ${existingUser.name || 'Staff / Landlord'}`);
     console.log(`  OTP:    ${otp}`);
-    console.log(`  Valid:  5 minutes`);
+    console.log(`  Valid:  ${otpTtlMinutes} minutes`);
     console.log('------------------------------------------------------------\n');
 
     logger.info({ mobile }, 'OTP generated and sent to console');

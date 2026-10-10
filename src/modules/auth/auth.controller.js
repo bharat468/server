@@ -1,6 +1,7 @@
 import { authService } from './auth.service.js';
 import { ApiResponse } from '../../common/utils/apiResponse.js';
 import { asyncHandler } from '../../common/utils/asyncHandler.js';
+import { systemSettingsService } from '../admin/systemSettings.service.js';
 
 export class AuthController {
   constructor(service = authService) {
@@ -33,19 +34,22 @@ export class AuthController {
     const result = await this.service.verifyOtp(mobile, otp);
 
     const isProd = process.env.NODE_ENV === 'production';
+    const accessMinutes = systemSettingsService.getCachedNumber('jwt_access_expiry_minutes', 15);
+    const refreshDays = systemSettingsService.getCachedNumber('jwt_refresh_expiry_days', 7);
+
     const accessCookieOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
       path: '/',
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: accessMinutes * 60 * 1000,
     };
     const refreshCookieOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: refreshDays * 24 * 60 * 60 * 1000,
     };
 
     // Store BOTH tokens in secure HTTP-only cookies
@@ -64,19 +68,22 @@ export class AuthController {
     const result = await this.service.refreshAccessToken(token);
 
     const isProd = process.env.NODE_ENV === 'production';
+    const accessMinutes = systemSettingsService.getCachedNumber('jwt_access_expiry_minutes', 15);
+    const refreshDays = systemSettingsService.getCachedNumber('jwt_refresh_expiry_days', 7);
+
     const accessCookieOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
       path: '/',
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: accessMinutes * 60 * 1000,
     };
     const refreshCookieOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: refreshDays * 24 * 60 * 60 * 1000,
     };
 
     // Rotate BOTH accessToken and refreshToken cookies

@@ -496,8 +496,10 @@ model SystemSetting {
   id          String   @id @default(uuid())
   key         String   @unique
   value       String
-  category    String   @default("GENERAL")
+  category    String   @default("PLATFORM_GENERAL")
   description String?
+  unit        String?
+  dataType    String   @default("string")
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@map("system_settings")

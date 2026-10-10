@@ -1,5 +1,6 @@
 import { prisma } from '../../config/database.config.js';
 import { ApiError } from '../../common/errors/apiError.js';
+import { systemSettingsService } from './systemSettings.service.js';
 
 export class AdminRepository {
   async listUsers() {
@@ -246,23 +247,11 @@ export class AdminRepository {
   }
 
   async listSettings() {
-    const rows = await prisma.$queryRawUnsafe(
-      `SELECT * FROM "system_settings" ORDER BY "category" ASC, "key" ASC;`
-    );
-    return rows;
+    return systemSettingsService.listSettings();
   }
 
   async updateSetting(key, value) {
-    await prisma.$executeRawUnsafe(
-      `UPDATE "system_settings" SET "value" = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE "key" = $2;`,
-      String(value),
-      key
-    );
-    const updated = await prisma.$queryRawUnsafe(
-      `SELECT * FROM "system_settings" WHERE "key" = $1 LIMIT 1;`,
-      key
-    );
-    return updated[0];
+    return systemSettingsService.updateSetting(key, value);
   }
 
   // SuperAdmin RBAC Role Repository Methods

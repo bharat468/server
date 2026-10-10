@@ -4,6 +4,7 @@ import v1Router from './routes/v1/index.js';
 import { notFoundHandler } from './common/middleware/notFound.middleware.js';
 import { errorHandler } from './common/middleware/error.middleware.js';
 import { ApiResponse } from './common/utils/apiResponse.js';
+import { maintenanceMiddleware } from './common/middleware/maintenance.middleware.js';
 
 export function createApp() {
   const app = express();
@@ -19,6 +20,8 @@ export function createApp() {
       )
     );
   });
+
+  app.use(maintenanceMiddleware);
 
   app.use('/api/v1', v1Router);
 
