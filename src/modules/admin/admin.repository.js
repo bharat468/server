@@ -250,8 +250,16 @@ export class AdminRepository {
     return systemSettingsService.listSettings();
   }
 
-  async updateSetting(key, value) {
-    return systemSettingsService.updateSetting(key, value);
+  async createSetting(data) {
+    return systemSettingsService.createSetting(data);
+  }
+
+  async updateSetting(key, updates) {
+    return systemSettingsService.updateSetting(key, updates);
+  }
+
+  async deleteSetting(key) {
+    return systemSettingsService.deleteSetting(key);
   }
 
   // SuperAdmin RBAC Role Repository Methods

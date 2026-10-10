@@ -105,10 +105,20 @@ router.get(
   requirePlatformPermission('PLATFORM_MANAGE_BILLING'),
   adminController.listSettings
 );
+router.post(
+  '/settings',
+  requirePlatformPermission('PLATFORM_MANAGE_BILLING'),
+  adminController.createSetting
+);
 router.put(
   '/settings/:key',
   requirePlatformPermission('PLATFORM_MANAGE_BILLING'),
   adminController.updateSetting
+);
+router.delete(
+  '/settings/:key',
+  requirePlatformPermission('PLATFORM_MANAGE_BILLING'),
+  adminController.deleteSetting
 );
 
 // Platform Oversight: Properties, Leases, Maintenance

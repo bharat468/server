@@ -193,12 +193,34 @@ export class AdminController {
     );
   });
 
+  createSetting = asyncHandler(async (req, res) => {
+    const { key, value, category, description, unit, dataType } = req.body;
+    const created = await adminRepository.createSetting({
+      key,
+      value,
+      category,
+      description,
+      unit,
+      dataType,
+    });
+    res.status(201).json(
+      new ApiResponse(201, created, 'System setting variable created successfully')
+    );
+  });
+
   updateSetting = asyncHandler(async (req, res) => {
     const { key } = req.params;
-    const { value } = req.body;
-    const updated = await adminRepository.updateSetting(key, value);
+    const updated = await adminRepository.updateSetting(key, req.body);
     res.status(200).json(
       new ApiResponse(200, updated, 'Setting updated successfully')
+    );
+  });
+
+  deleteSetting = asyncHandler(async (req, res) => {
+    const { key } = req.params;
+    const result = await adminRepository.deleteSetting(key);
+    res.status(200).json(
+      new ApiResponse(200, result, 'Setting removed successfully')
     );
   });
 
