@@ -172,9 +172,10 @@ export class ApplicationRepository {
       // 5. Generate Initial Rent Schedules (First 3 months)
       const schedules = [];
       for (let i = 0; i < 3; i++) {
-        const scheduleDate = new Date(startDate);
-        scheduleDate.setMonth(scheduleDate.getMonth() + i);
-        scheduleDate.setDate(rentRule.dueDay);
+        const targetYear = startDate.getFullYear();
+        const targetMonth = startDate.getMonth() + i;
+        const targetDay = rentRule.dueDay || 5;
+        const scheduleDate = new Date(targetYear, targetMonth, targetDay, 12, 0, 0);
 
         const periodName = scheduleDate.toLocaleString('default', {
           month: 'long',
