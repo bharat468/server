@@ -43,14 +43,21 @@ export class TenantService {
 
     if (user) {
       const scope = await getUserScope(user);
-      if (!scope.isSuperAdmin && tenant.property) {
-        const hasAccess =
-          tenant.property.ownerId === user.id ||
-          tenant.property.createdById === user.id ||
-          scope.orgIds.includes(tenant.property.organizationId);
+      if (!scope.isSuperAdmin) {
+        if (tenant.property) {
+          const hasAccess =
+            tenant.property.ownerId === user.id ||
+            tenant.property.createdById === user.id ||
+            scope.orgIds.includes(tenant.property.organizationId);
 
-        if (!hasAccess) {
-          throw new ApiError(403, 'Access denied: You do not have permission to view this tenant.');
+          if (!hasAccess) {
+            throw new ApiError(403, 'Access denied: You do not have permission to view this tenant.');
+          }
+        } else {
+          const hasAccess = tenant.createdById === user.id;
+          if (!hasAccess) {
+            throw new ApiError(403, 'Access denied: You do not have permission to view this tenant.');
+          }
         }
       }
     }

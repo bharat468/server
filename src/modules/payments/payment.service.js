@@ -1,3 +1,4 @@
+import { prisma } from '../../config/database.config.js';
 import { paymentRepository } from './payment.repository.js';
 import { propertyRepository } from '../properties/property.repository.js';
 import { ApiError } from '../../common/errors/apiError.js';
@@ -58,6 +59,10 @@ export class PaymentService {
   }
 
   async createPayment(payload, user) {
+    if (!payload.amount || isNaN(parseFloat(payload.amount)) || parseFloat(payload.amount) <= 0) {
+      throw new ApiError(400, 'Valid payment amount greater than 0 is required');
+    }
+
     if (payload.propertyId && user) {
       const property = await propertyRepository.findById(payload.propertyId);
       if (!property) {
@@ -73,6 +78,30 @@ export class PaymentService {
         if (!hasAccess) {
           throw new ApiError(403, "Access denied: You cannot record payments for another landlord's property.");
         }
+      }
+    } else if (payload.tenantId && user) {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: payload.tenantId },
+        include: { property: true },
+      });
+      if (!tenant) {
+        throw new ApiError(404, 'Selected tenant not found');
+      }
+      const scope = await getUserScope(user);
+      if (!scope.isSuperAdmin) {
+        const hasAccess =
+          (tenant.property &&
+            (tenant.property.ownerId === user.id ||
+              tenant.property.createdById === user.id ||
+              scope.orgIds.includes(tenant.property.organizationId))) ||
+          tenant.createdById === user.id;
+
+        if (!hasAccess) {
+          throw new ApiError(403, "Access denied: You cannot record payments for another landlord's tenant.");
+        }
+      }
+      if (tenant.propertyId && !payload.propertyId) {
+        payload.propertyId = tenant.propertyId;
       }
     }
 
