@@ -322,8 +322,7 @@ export class AuthService {
     const isSuperAdmin =
       Boolean(user.isSuperAdmin) ||
       user.adminRole === 'SUPER_ADMIN' ||
-      user.mobile === '9876543210' ||
-      user.userRoles?.some((ur) => ur.role?.slug === 'owner');
+      user.mobile === '9876543210';
 
     const roleName = isSuperAdmin
       ? 'Platform SuperAdministrator'
