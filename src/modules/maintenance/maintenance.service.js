@@ -63,6 +63,23 @@ export class MaintenanceService {
       throw new ApiError(404, 'Maintenance ticket not found');
     }
 
+    if (user) {
+      const scope = await getUserScope(user);
+      if (!scope.isSuperAdmin && ticket.property) {
+        const hasAccess =
+          ticket.property.ownerId === user.id ||
+          ticket.property.createdById === user.id ||
+          scope.orgIds.includes(ticket.property.organizationId);
+
+        if (!hasAccess) {
+          throw new ApiError(
+            403,
+            'Access denied: You cannot assign staff to tickets on properties you do not manage'
+          );
+        }
+      }
+    }
+
     return maintenanceRepository.update(id, {
       assignedStaffId,
       status: 'ASSIGNED',
@@ -73,6 +90,25 @@ export class MaintenanceService {
     const ticket = await maintenanceRepository.findById(id);
     if (!ticket) {
       throw new ApiError(404, 'Maintenance ticket not found');
+    }
+
+    if (user) {
+      const scope = await getUserScope(user);
+      const isTicketTenant = ticket.tenantId === user.id;
+      const isStaffAssigned = ticket.assignedStaffId === user.id;
+      const isOwnerOrAdmin =
+        scope.isSuperAdmin ||
+        (ticket.property &&
+          (ticket.property.ownerId === user.id ||
+            ticket.property.createdById === user.id ||
+            scope.orgIds.includes(ticket.property.organizationId)));
+
+      if (!isTicketTenant && !isStaffAssigned && !isOwnerOrAdmin) {
+        throw new ApiError(
+          403,
+          'Access denied: You cannot update the status of this maintenance ticket'
+        );
+      }
     }
 
     const data = { status };

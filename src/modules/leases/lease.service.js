@@ -1,3 +1,4 @@
+import { prisma } from '../../config/database.config.js';
 import { leaseRepository } from './lease.repository.js';
 import { ApiError } from '../../common/errors/apiError.js';
 import { getUserScope } from '../../common/utils/scopeHelper.js';
@@ -118,6 +119,38 @@ export class LeaseService {
   async paySchedule(scheduleId, { amount, paidOn }, user) {
     if (!amount || amount <= 0) {
       throw new ApiError(400, 'Payment amount must be greater than 0');
+    }
+
+    const schedule = await prisma.rentSchedule.findUnique({
+      where: { id: scheduleId },
+      include: {
+        lease: {
+          include: {
+            property: true,
+          },
+        },
+      },
+    });
+
+    if (!schedule) {
+      throw new ApiError(404, 'Rent schedule not found');
+    }
+
+    if (user) {
+      const scope = await getUserScope(user);
+      const isTenant = schedule.lease.tenantId === user.id;
+      const isOwnerOrAdmin =
+        scope.isSuperAdmin ||
+        schedule.lease.property?.ownerId === user.id ||
+        schedule.lease.property?.createdById === user.id ||
+        scope.orgIds.includes(schedule.lease.property?.organizationId);
+
+      if (!isTenant && !isOwnerOrAdmin) {
+        throw new ApiError(
+          403,
+          'Access denied: You are not authorized to record payments for this rent schedule'
+        );
+      }
     }
 
     return leaseRepository.recordSchedulePayment(scheduleId, {

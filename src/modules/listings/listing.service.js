@@ -111,6 +111,20 @@ export class ListingService {
       throw new ApiError(404, 'Listing not found');
     }
 
+    if (user) {
+      const scope = await getUserScope(user);
+      if (!scope.isSuperAdmin && listing.property) {
+        const hasAccess =
+          listing.property.ownerId === user.id ||
+          listing.property.createdById === user.id ||
+          scope.orgIds.includes(listing.property.organizationId);
+
+        if (!hasAccess) {
+          throw new ApiError(403, 'Access denied: You cannot delete this listing');
+        }
+      }
+    }
+
     await listingRepository.delete(id);
     // Return unit to VACANT if it was LISTED
     await unitRepository.update(listing.unitId, { status: 'VACANT' });
