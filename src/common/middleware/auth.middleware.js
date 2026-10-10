@@ -4,15 +4,17 @@ import { ApiError } from '../errors/apiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const authenticate = asyncHandler(async (req, _res, next) => {
-  const authHeader = req.headers.authorization;
+  let token = req.cookies?.accessToken;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new ApiError(401, 'Authentication required. Please provide a Bearer token in Authorization header.');
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
   }
 
-  const token = authHeader.split(' ')[1];
   if (!token) {
-    throw new ApiError(401, 'Authentication token is missing');
+    throw new ApiError(401, 'Authentication required. Please log in.');
   }
 
   const decoded = authService.verifyJwt(token);

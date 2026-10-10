@@ -33,7 +33,14 @@ export class AuthController {
     const result = await this.service.verifyOtp(mobile, otp);
 
     const isProd = process.env.NODE_ENV === 'production';
-    const cookieOptions = {
+    const accessCookieOptions = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    };
+    const refreshCookieOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
@@ -41,8 +48,9 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     };
 
-    // Set secure HTTP-only cookie for refresh token
-    res.cookie('refreshToken', result.refreshToken, cookieOptions);
+    // Store BOTH tokens in secure HTTP-only cookies
+    res.cookie('accessToken', result.accessToken, accessCookieOptions);
+    res.cookie('refreshToken', result.refreshToken, refreshCookieOptions);
 
     const message = result.isNewUser
       ? 'Welcome to RENTMATE! Your account has been registered.'
@@ -56,14 +64,24 @@ export class AuthController {
     const result = await this.service.refreshAccessToken(token);
 
     const isProd = process.env.NODE_ENV === 'production';
-    // Rotate refresh token in cookie
-    res.cookie('refreshToken', result.refreshToken, {
+    const accessCookieOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    };
+    const refreshCookieOptions = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+
+    // Rotate BOTH accessToken and refreshToken cookies
+    res.cookie('accessToken', result.accessToken, accessCookieOptions);
+    res.cookie('refreshToken', result.refreshToken, refreshCookieOptions);
 
     res.status(200).json(
       new ApiResponse(200, result, 'Access token refreshed successfully')
@@ -101,12 +119,14 @@ export class AuthController {
 
   logout = asyncHandler(async (_req, res) => {
     const isProd = process.env.NODE_ENV === 'production';
-    res.clearCookie('refreshToken', {
+    const clearOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
       path: '/',
-    });
+    };
+    res.clearCookie('accessToken', clearOptions);
+    res.clearCookie('refreshToken', clearOptions);
     res.status(200).json(
       new ApiResponse(200, null, 'Logged out successfully')
     );
