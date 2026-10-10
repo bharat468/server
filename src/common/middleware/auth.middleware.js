@@ -17,6 +17,10 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
 
   const decoded = authService.verifyJwt(token);
 
+  if (decoded.tokenType === 'REFRESH') {
+    throw new ApiError(401, 'Invalid token type: Refresh token cannot be used for API authorization');
+  }
+
   const user = await userRepository.findById(decoded.id);
   if (!user) {
     throw new ApiError(401, 'User account associated with this token does not exist');

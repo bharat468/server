@@ -22,6 +22,7 @@ export class AuthService {
       id: user.id,
       mobile: user.mobile,
       status: user.status,
+      tokenType: 'ACCESS',
       ...additionalClaims,
     };
 
@@ -30,7 +31,11 @@ export class AuthService {
     });
 
     const refreshToken = jwt.sign(
-      { id: user.id, tokenType: 'REFRESH' },
+      {
+        id: user.id,
+        tokenType: 'REFRESH',
+        jti: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+      },
       env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -300,39 +305,54 @@ export class AuthService {
     }
 
     if (decoded.tokenType !== 'REFRESH') {
-      throw new ApiError(403, 'Invalid token type');
+      throw new ApiError(403, 'Invalid token type: Refresh token required');
     }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       include: {
-        userRoles: { include: { role: true } },
+        userRoles: { include: { role: true, organization: true } },
       },
     });
 
-    if (!user || user.status === 'SUSPENDED') {
-      throw new ApiError(403, 'User account is inactive or not found');
+    if (!user || user.status === 'SUSPENDED' || user.status === 'INACTIVE') {
+      throw new ApiError(403, `User account is ${user?.status ? user.status.toLowerCase() : 'not found'}`);
     }
 
     const isSuperAdmin =
+      Boolean(user.isSuperAdmin) ||
+      user.adminRole === 'SUPER_ADMIN' ||
       user.mobile === '9876543210' ||
-      user.userRoles?.some((ur) => ur.role.slug === 'owner');
+      user.userRoles?.some((ur) => ur.role?.slug === 'owner');
+
+    const roleName = isSuperAdmin
+      ? 'Platform SuperAdministrator'
+      : user.userRoles?.[0]?.role?.name || 'Landlord';
 
     const { accessToken, refreshToken: newRefreshToken } = this.generateTokens(user, {
-      role: user.userRoles?.[0]?.role?.name || 'Owner',
+      role: roleName,
       isSuperAdmin,
+      adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
     });
+
+    const { permissions, platformPermissions } = await this.calculateUserPermissions(user.id);
 
     return {
       accessToken,
+      token: accessToken, // for client backward compatibility
       refreshToken: newRefreshToken,
       user: {
         id: user.id,
         mobile: user.mobile,
-        name: user.name,
+        name: user.name || (isSuperAdmin ? 'SuperAdmin' : 'User'),
         email: user.email,
         status: user.status,
+        role: roleName,
         isSuperAdmin,
+        adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
+        permissions,
+        platformPermissions,
+        createdAt: user.createdAt,
       },
     };
   }

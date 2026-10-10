@@ -32,13 +32,17 @@ export class AuthController {
     const { mobile, otp } = req.body;
     const result = await this.service.verifyOtp(mobile, otp);
 
-    // Set secure HTTP-only cookie for refresh token
-    res.cookie('refreshToken', result.refreshToken, {
+    const isProd = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProd,
       sameSite: 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    };
+
+    // Set secure HTTP-only cookie for refresh token
+    res.cookie('refreshToken', result.refreshToken, cookieOptions);
 
     const message = result.isNewUser
       ? 'Welcome to RENTMATE! Your account has been registered.'
@@ -51,11 +55,13 @@ export class AuthController {
     const token = req.cookies?.refreshToken || req.body?.refreshToken;
     const result = await this.service.refreshAccessToken(token);
 
+    const isProd = process.env.NODE_ENV === 'production';
     // Rotate refresh token in cookie
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProd,
       sameSite: 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -94,7 +100,13 @@ export class AuthController {
   });
 
   logout = asyncHandler(async (_req, res) => {
-    res.clearCookie('refreshToken');
+    const isProd = process.env.NODE_ENV === 'production';
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+    });
     res.status(200).json(
       new ApiResponse(200, null, 'Logged out successfully')
     );
