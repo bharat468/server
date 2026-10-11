@@ -5,11 +5,15 @@ import { notFoundHandler } from './common/middleware/notFound.middleware.js';
 import { errorHandler } from './common/middleware/error.middleware.js';
 import { ApiResponse } from './common/utils/apiResponse.js';
 import { maintenanceMiddleware } from './common/middleware/maintenance.middleware.js';
+import { responseFormatMiddleware } from './common/middleware/responseFormat.middleware.js';
 
 export function createApp() {
   const app = express();
 
   configureApp(app);
+
+  // Global response formatter to guarantee dynamic path and statusCode in all responses
+  app.use(responseFormatMiddleware);
 
   app.get('/', (_request, response) => {
     response.status(200).json(
