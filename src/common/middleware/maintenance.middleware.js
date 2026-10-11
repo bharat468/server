@@ -27,6 +27,8 @@ export function maintenanceMiddleware(req, res, next) {
   return res.status(503).json({
     success: false,
     statusCode: 503,
+    path: req.originalUrl || req.url,
+    method: req.method,
     error: 'SERVICE_UNAVAILABLE',
     message: 'RentMate Platform is currently undergoing scheduled maintenance. Please check back shortly.',
     timestamp: new Date().toISOString(),

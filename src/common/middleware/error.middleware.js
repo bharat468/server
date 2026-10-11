@@ -1,6 +1,6 @@
 import { ApiError } from '../errors/apiError.js';
 
-export const errorHandler = (err, _req, res, _next) => {
+export const errorHandler = (err, req, res, _next) => {
   let error = err;
 
   if (!(error instanceof ApiError)) {
@@ -80,8 +80,11 @@ export const errorHandler = (err, _req, res, _next) => {
   const response = {
     success: false,
     statusCode: error.statusCode,
+    path: req?.originalUrl || req?.url || null,
+    method: req?.method || null,
     message: error.message,
     errors: error.errors,
+    timestamp: new Date().toISOString(),
     ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
   };
 
