@@ -51,47 +51,30 @@ export class OrganizationService {
 
   async getUserOrganizations(userOrId) {
     const userId = typeof userOrId === 'object' ? userOrId?.id : userOrId;
-    let isSuperAdmin = typeof userOrId === 'object' && (userOrId?.isSuperAdmin || userOrId?.adminRole === 'SUPER_ADMIN');
+    let mobile = typeof userOrId === 'object' ? userOrId?.mobile : null;
 
-    if (!isSuperAdmin && userId) {
+    if (!mobile && userId) {
       const dbUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, isSuperAdmin: true, adminRole: true, name: true, mobile: true },
+        select: { id: true, mobile: true, name: true },
       });
-      if (dbUser?.isSuperAdmin || dbUser?.adminRole === 'SUPER_ADMIN') {
-        isSuperAdmin = true;
+      if (dbUser?.mobile) {
+        mobile = dbUser.mobile;
       }
     }
 
-    if (isSuperAdmin) {
-      const allOrgs = await prisma.organization.findMany({
-        include: {
-          owner: {
-            select: { id: true, name: true, mobile: true, email: true },
-          },
-          _count: {
-            select: { members: true },
-          },
-          subscriptions: {
-            include: { plan: true },
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (allOrgs.length > 0) {
-        return allOrgs;
-      }
+    const orConditions = [];
+    if (userId) {
+      orConditions.push({ ownerId: userId });
+      orConditions.push({ members: { some: { userId } } });
+    }
+    if (mobile) {
+      orConditions.push({ owner: { mobile } });
+      orConditions.push({ members: { some: { user: { mobile } } } });
     }
 
     let orgs = await prisma.organization.findMany({
-      where: {
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId } } },
-        ],
-      },
+      where: orConditions.length > 0 ? { OR: orConditions } : { ownerId: userId },
       include: {
         owner: {
           select: { id: true, name: true, mobile: true, email: true },
@@ -105,7 +88,6 @@ export class OrganizationService {
           take: 1,
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
 
     if (orgs.length === 0 && userId) {
