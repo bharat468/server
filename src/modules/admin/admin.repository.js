@@ -6,6 +6,7 @@ export class AdminRepository {
   async listUsers() {
     return prisma.user.findMany({
       include: {
+        ownedOrganizations: true,
         organizationMembers: {
           include: {
             organization: true,
