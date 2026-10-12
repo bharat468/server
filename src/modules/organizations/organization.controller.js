@@ -17,7 +17,7 @@ export class OrganizationController {
   });
 
   list = asyncHandler(async (req, res) => {
-    const organizations = await organizationService.getUserOrganizations(req.user.id);
+    const organizations = await organizationService.getUserOrganizations(req.user);
     res.status(200).json(
       new ApiResponse(200, organizations, 'Organizations fetched successfully')
     );

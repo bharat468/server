@@ -49,8 +49,43 @@ export class OrganizationService {
     });
   }
 
-  async getUserOrganizations(userId) {
-    return prisma.organization.findMany({
+  async getUserOrganizations(userOrId) {
+    const userId = typeof userOrId === 'object' ? userOrId?.id : userOrId;
+    let isSuperAdmin = typeof userOrId === 'object' && (userOrId?.isSuperAdmin || userOrId?.adminRole === 'SUPER_ADMIN');
+
+    if (!isSuperAdmin && userId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, isSuperAdmin: true, adminRole: true, name: true, mobile: true },
+      });
+      if (dbUser?.isSuperAdmin || dbUser?.adminRole === 'SUPER_ADMIN') {
+        isSuperAdmin = true;
+      }
+    }
+
+    if (isSuperAdmin) {
+      const allOrgs = await prisma.organization.findMany({
+        include: {
+          owner: {
+            select: { id: true, name: true, mobile: true, email: true },
+          },
+          _count: {
+            select: { members: true },
+          },
+          subscriptions: {
+            include: { plan: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (allOrgs.length > 0) {
+        return allOrgs;
+      }
+    }
+
+    let orgs = await prisma.organization.findMany({
       where: {
         OR: [
           { ownerId: userId },
@@ -72,6 +107,38 @@ export class OrganizationService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    if (orgs.length === 0 && userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        const baseSlug = (user.name || 'workspace').toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const slug = `${baseSlug || 'workspace'}-${Date.now().toString(36)}`;
+        const newOrg = await this.createOrganization({
+          name: user.name ? `${user.name}'s Workspace` : 'Primary Workspace',
+          slug,
+          ownerId: userId,
+        });
+        const createdOrg = await prisma.organization.findUnique({
+          where: { id: newOrg.id },
+          include: {
+            owner: {
+              select: { id: true, name: true, mobile: true, email: true },
+            },
+            _count: {
+              select: { members: true },
+            },
+            subscriptions: {
+              include: { plan: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        });
+        return createdOrg ? [createdOrg] : [newOrg];
+      }
+    }
+
+    return orgs;
   }
 
   async getOrganizationDetails(organizationId, user) {
@@ -139,11 +206,18 @@ export class OrganizationService {
     { organizationId, mobile, name, email, roleId, roleSlug = 'property-manager', propertyScope = [] },
     currentUser = null
   ) {
+    // Sanitize and validate mobile: exactly 10 digits
+    const cleanMobile = String(mobile || '').replace(/\D/g, '').slice(0, 10);
+    if (!/^\d{10}$/.test(cleanMobile)) {
+      throw new ApiError(400, 'A valid 10-digit mobile number is required.');
+    }
+    mobile = cleanMobile;
+
     // 0. Resolve & Validate target organization
     let targetOrgId = organizationId;
     if (!targetOrgId || targetOrgId === 'default') {
-      if (currentUser?.id) {
-        const userOrgs = await this.getUserOrganizations(currentUser.id);
+      if (currentUser) {
+        const userOrgs = await this.getUserOrganizations(currentUser);
         if (userOrgs && userOrgs.length > 0) {
           targetOrgId = userOrgs[0].id;
         }
