@@ -42,7 +42,7 @@ describe('Authentication Module Integration Tests', () => {
   test('rejects send-otp when mobile is unregistered', async () => {
     const response = await request(app)
       .post('/api/v1/auth/send-otp')
-      .send({ mobile: '9999999999' });
+      .send({ mobile: '9000000000' });
 
     expect(response.status).toBe(403);
     expect(response.body.success).toBe(false);
