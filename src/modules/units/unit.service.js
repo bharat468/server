@@ -69,9 +69,19 @@ export class UnitService {
       }
     }
 
+    if (!payload.unitNumber || !payload.unitNumber.trim()) {
+      throw new ApiError(400, 'Unit number is required');
+    }
+    if (isNaN(parseFloat(payload.rentAmount)) || parseFloat(payload.rentAmount) <= 0) {
+      throw new ApiError(400, 'Valid rent amount greater than 0 is required');
+    }
+    if (payload.depositAmount !== undefined && (isNaN(parseFloat(payload.depositAmount)) || parseFloat(payload.depositAmount) < 0)) {
+      throw new ApiError(400, 'Deposit amount cannot be negative');
+    }
+
     return unitRepository.create({
       propertyId: payload.propertyId,
-      unitNumber: payload.unitNumber,
+      unitNumber: payload.unitNumber.trim(),
       floor: payload.floor ? parseInt(payload.floor, 10) : 1,
       type: payload.type || 'FLAT_2BHK',
       areaSqFt: payload.areaSqFt ? parseFloat(payload.areaSqFt) : null,

@@ -44,12 +44,19 @@ export class MaintenanceService {
       throw new ApiError(404, 'Associated property not found');
     }
 
+    if (!payload.title || !payload.title.trim()) {
+      throw new ApiError(400, 'Complaint title is required');
+    }
+    if (!payload.description || !payload.description.trim()) {
+      throw new ApiError(400, 'Complaint description is required');
+    }
+
     return maintenanceRepository.create({
       propertyId: payload.propertyId,
       unitId: payload.unitId || null,
       tenantId: user.id,
-      title: payload.title,
-      description: payload.description,
+      title: payload.title.trim(),
+      description: payload.description.trim(),
       category: payload.category || 'PLUMBING',
       priority: payload.priority || 'MEDIUM',
       status: 'OPEN',
@@ -112,7 +119,13 @@ export class MaintenanceService {
     }
 
     const data = { status };
-    if (cost !== undefined) data.cost = parseFloat(cost);
+    if (cost !== undefined) {
+      const parsedCost = parseFloat(cost);
+      if (isNaN(parsedCost) || parsedCost < 0) {
+        throw new ApiError(400, 'Repair cost cannot be negative');
+      }
+      data.cost = parsedCost;
+    }
     if (notes) data.notes = notes;
     if (status === 'RESOLVED' || status === 'CLOSED') {
       data.resolvedAt = new Date();

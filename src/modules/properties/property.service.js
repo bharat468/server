@@ -108,6 +108,22 @@ export class PropertyService {
       }
     }
 
+    if (!payload.title || !payload.title.trim()) {
+      throw new ApiError(400, 'Property title is required');
+    }
+    if (!payload.address || !payload.address.trim()) {
+      throw new ApiError(400, 'Property address is required');
+    }
+    if (!payload.city || !payload.city.trim()) {
+      throw new ApiError(400, 'City is required');
+    }
+    if (isNaN(parseFloat(payload.rent)) || parseFloat(payload.rent) <= 0) {
+      throw new ApiError(400, 'Valid rental amount greater than 0 is required');
+    }
+    if (payload.bedrooms !== undefined && (isNaN(parseInt(payload.bedrooms, 10)) || parseInt(payload.bedrooms, 10) < 0)) {
+      throw new ApiError(400, 'Bedrooms count cannot be negative');
+    }
+
     return propertyRepository.create({
       title: payload.title,
       address: payload.address,
