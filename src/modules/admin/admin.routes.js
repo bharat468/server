@@ -138,4 +138,11 @@ router.get(
   adminController.listMaintenance
 );
 
+// Background Cron & Lifecycle Automation
+router.post(
+  '/cron/run',
+  requirePlatformPermission('PLATFORM_MANAGE_BILLING'),
+  adminController.runLifecycleCron
+);
+
 export default router;

@@ -81,6 +81,47 @@ export class TenantService {
         if (!hasAccess) {
           throw new ApiError(403, 'Access denied: You cannot assign tenants to a property you do not manage.');
         }
+
+        // Real-Life SaaS Guard: Check subscription validity & tenant quota
+        if (property.organizationId) {
+          const subscription = await prisma.subscription.findFirst({
+            where: { organizationId: property.organizationId },
+            include: { plan: true },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          if (subscription) {
+            const now = new Date();
+            const isExpired =
+              subscription.status === 'EXPIRED' ||
+              (subscription.endDate && new Date(subscription.endDate) < now) ||
+              (subscription.expiresAt && new Date(subscription.expiresAt) < now);
+
+            if (isExpired) {
+              throw new ApiError(
+                403,
+                'Subscription Expired: Your organization subscription has expired. Please renew your plan to onboard new tenants.'
+              );
+            }
+
+            if (subscription.plan && subscription.plan.maxTenants > 0) {
+              const currentTenantCount = await prisma.tenant.count({
+                where: {
+                  property: {
+                    organizationId: property.organizationId,
+                  },
+                },
+              });
+
+              if (currentTenantCount >= subscription.plan.maxTenants) {
+                throw new ApiError(
+                  403,
+                  `Plan Quota Limit Reached: Your current plan (${subscription.plan.name}) allows a maximum of ${subscription.plan.maxTenants} tenants. Please upgrade your plan to onboard more tenants.`
+                );
+              }
+            }
+          }
+        }
       }
     }
 

@@ -1,4 +1,5 @@
 import { adminRepository } from './admin.repository.js';
+import { cronService } from '../cron/cron.service.js';
 import { ApiResponse } from '../../common/utils/apiResponse.js';
 import { asyncHandler } from '../../common/utils/asyncHandler.js';
 import { ApiError } from '../../common/errors/apiError.js';
@@ -242,6 +243,14 @@ export class AdminController {
     const tickets = await adminRepository.listAllMaintenance();
     res.status(200).json(
       new ApiResponse(200, tickets, 'Platform maintenance tickets retrieved successfully')
+    );
+  });
+
+  runLifecycleCron = asyncHandler(async (req, res) => {
+    const asOfDate = req.body?.asOfDate ? new Date(req.body.asOfDate) : new Date();
+    const result = await cronService.runDailyLifecycleCron(asOfDate);
+    res.status(200).json(
+      new ApiResponse(200, result, 'Daily lifecycle cron job executed successfully')
     );
   });
 }

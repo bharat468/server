@@ -1,3 +1,4 @@
+import { prisma } from '../../config/database.config.js';
 import { propertyRepository } from './property.repository.js';
 import { ApiError } from '../../common/errors/apiError.js';
 import { getUserScope } from '../../common/utils/scopeHelper.js';
@@ -69,6 +70,43 @@ export class PropertyService {
   async createProperty(payload, user) {
     const scope = await getUserScope(user);
     const targetOrgId = payload.organizationId || scope.primaryOrgId;
+
+    // Real-Life SaaS Guard: Check subscription validity & plan quotas for non-superadmins
+    if (targetOrgId && !scope.isSuperAdmin) {
+      const subscription = await prisma.subscription.findFirst({
+        where: { organizationId: targetOrgId },
+        include: { plan: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (subscription) {
+        const now = new Date();
+        const isExpired =
+          subscription.status === 'EXPIRED' ||
+          (subscription.endDate && new Date(subscription.endDate) < now) ||
+          (subscription.expiresAt && new Date(subscription.expiresAt) < now);
+
+        if (isExpired) {
+          throw new ApiError(
+            403,
+            'Subscription Expired: Your organization subscription has expired. Please renew your plan to add new properties.'
+          );
+        }
+
+        if (subscription.plan && subscription.plan.maxProperties > 0) {
+          const currentCount = await prisma.property.count({
+            where: { organizationId: targetOrgId },
+          });
+
+          if (currentCount >= subscription.plan.maxProperties) {
+            throw new ApiError(
+              403,
+              `Plan Quota Limit Reached: Your current plan (${subscription.plan.name}) allows a maximum of ${subscription.plan.maxProperties} properties. Please upgrade your plan to add more properties.`
+            );
+          }
+        }
+      }
+    }
 
     return propertyRepository.create({
       title: payload.title,

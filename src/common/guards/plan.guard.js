@@ -51,7 +51,7 @@ export const checkPlanQuota = (quotaType) =>
       return next();
     }
 
-    // 1. Expiration Date Check
+    // 1. Expiration & Status Check
     if (subscription.status === 'SUSPENDED') {
       throw new ApiError(
         403,
@@ -59,8 +59,16 @@ export const checkPlanQuota = (quotaType) =>
       );
     }
 
-    if (subscription.expiresAt && new Date(subscription.expiresAt).getTime() < Date.now()) {
-      const expiryFormatted = new Date(subscription.expiresAt).toLocaleDateString('en-IN', {
+    if (subscription.status === 'EXPIRED') {
+      throw new ApiError(
+        403,
+        'Subscription Expired: Your organization plan has expired. Please renew your subscription to continue managing properties.'
+      );
+    }
+
+    const expiryDate = subscription.expiresAt || subscription.endDate;
+    if (expiryDate && new Date(expiryDate).getTime() < Date.now()) {
+      const expiryFormatted = new Date(expiryDate).toLocaleDateString('en-IN', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
