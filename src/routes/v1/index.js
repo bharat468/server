@@ -13,6 +13,7 @@ import listingRouter from '../../modules/listings/listing.routes.js';
 import applicationRouter from '../../modules/applications/application.routes.js';
 import leaseRouter from '../../modules/leases/lease.routes.js';
 import maintenanceRouter from '../../modules/maintenance/maintenance.routes.js';
+import reportsRouter from '../../modules/reports/reports.routes.js';
 
 const router = Router();
 
@@ -72,5 +73,8 @@ router.use('/admin', adminRouter);
 
 // Subscription & Pricing Plans (/api/v1/plans)
 router.use('/plans', planRouter);
+
+// Exportable Financial & Operational Reports (/api/v1/reports)
+router.use('/reports', reportsRouter);
 
 export default router;
