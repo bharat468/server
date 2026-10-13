@@ -4,6 +4,9 @@
 > Built with **Modern JavaScript (Node.js ES Modules)**, Express 5, Prisma ORM, and PostgreSQL.  
 > Architecture: **Layered Clean Architecture (Controller — Service — Repository)** with strict Multi-Tenant Data Isolation and Dynamic Role-Based Access Control (RBAC).
 
+> 📘 **Looking for the complete developer setup, database migration, and seed data guide?**  
+> Check the complete handover documentation: [RENTMATE_FULL_SETUP_AND_HANDOVER_GUIDE.md](./RENTMATE_FULL_SETUP_AND_HANDOVER_GUIDE.md)
+
 ---
 
 ## 📑 Table of Contents
