@@ -107,13 +107,15 @@ model User {
 }
 
 model Organization {
-  id        String               @id @default(uuid())
-  name      String
-  slug      String               @unique
-  ownerId   String
-  owner     User                 @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
+  id              String               @id @default(uuid())
+  name            String
+  slug            String               @unique
+  ownerId         String
+  owner           User                 @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  electricityRate Float                @default(9.0)
+  waterRate       Float                @default(20.0)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   members       OrganizationMember[]
   roles         Role[]
@@ -341,6 +343,7 @@ model Unit {
   listings            RentalListing[]
   leases              Lease[]
   maintenanceRequests MaintenanceRequest[]
+  meterReadings       MeterReading[]
 
   @@unique([propertyId, unitNumber])
   @@map("units")
@@ -503,5 +506,24 @@ model SystemSetting {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@map("system_settings")
+}
+
+model MeterReading {
+  id              String   @id @default(uuid())
+  unitId          String
+  unit            Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  utilityType     String   @default("ELECTRICITY") // 'ELECTRICITY' | 'WATER'
+  readingMonth    String   // e.g. "2026-06"
+  previousReading Float    @default(0)
+  currentReading  Float
+  consumedUnits   Float    // currentReading - previousReading
+  ratePerUnit     Float
+  amount          Float    // consumedUnits * ratePerUnit
+  status          String   @default("BILLED") // 'RECORDED' | 'BILLED' | 'PAID'
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("meter_readings")
 }
 
