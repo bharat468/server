@@ -5,7 +5,17 @@ export class TenantRepository {
     return prisma.tenant.findMany({
       where,
       include: {
-        property: true,
+        property: {
+          include: {
+            units: {
+              include: {
+                meterReadings: {
+                  orderBy: { createdAt: 'desc' },
+                },
+              },
+            },
+          },
+        },
         payments: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -16,7 +26,17 @@ export class TenantRepository {
     return prisma.tenant.findUnique({
       where: { id },
       include: {
-        property: true,
+        property: {
+          include: {
+            units: {
+              include: {
+                meterReadings: {
+                  orderBy: { createdAt: 'desc' },
+                },
+              },
+            },
+          },
+        },
         payments: true,
       },
     });
@@ -26,7 +46,15 @@ export class TenantRepository {
     return prisma.tenant.create({
       data,
       include: {
-        property: true,
+        property: {
+          include: {
+            units: {
+              include: {
+                meterReadings: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -36,7 +64,15 @@ export class TenantRepository {
       where: { id },
       data,
       include: {
-        property: true,
+        property: {
+          include: {
+            units: {
+              include: {
+                meterReadings: true,
+              },
+            },
+          },
+        },
       },
     });
   }
