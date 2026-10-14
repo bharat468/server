@@ -13,6 +13,13 @@ export class PropertyRepository {
         tenants: true,
         payments: true,
         organization: true,
+        units: {
+          include: {
+            meterReadings: {
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        },
         createdBy: {
           select: {
             id: true,
@@ -32,6 +39,14 @@ export class PropertyRepository {
       include: {
         tenants: true,
         payments: true,
+        organization: true,
+        units: {
+          include: {
+            meterReadings: {
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        },
         createdBy: {
           select: {
             id: true,

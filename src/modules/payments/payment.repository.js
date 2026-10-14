@@ -6,7 +6,18 @@ export class PaymentRepository {
       where,
       include: {
         tenant: true,
-        property: true,
+        property: {
+          include: {
+            organization: true,
+            units: {
+              include: {
+                meterReadings: {
+                  orderBy: { createdAt: 'desc' },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -17,7 +28,18 @@ export class PaymentRepository {
       where: { id },
       include: {
         tenant: true,
-        property: true,
+        property: {
+          include: {
+            organization: true,
+            units: {
+              include: {
+                meterReadings: {
+                  orderBy: { createdAt: 'desc' },
+                },
+              },
+            },
+          },
+        },
       },
     });
   }
