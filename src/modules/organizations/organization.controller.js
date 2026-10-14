@@ -106,6 +106,21 @@ export class OrganizationController {
       new ApiResponse(201, role, 'Custom role created successfully')
     );
   });
+
+  updateUtilityRates = asyncHandler(async (req, res) => {
+    const organizationId = req.params.organizationId || req.params.id;
+    const { electricityRate, waterRate } = req.body;
+
+    const updated = await organizationService.updateUtilityRates(
+      organizationId,
+      { electricityRate, waterRate },
+      req.user
+    );
+
+    res.status(200).json(
+      new ApiResponse(200, updated, 'Utility rates updated successfully')
+    );
+  });
 }
 
 export const organizationController = new OrganizationController();

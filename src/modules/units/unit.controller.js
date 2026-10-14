@@ -37,6 +37,24 @@ export class UnitController {
       new ApiResponse(200, null, 'Unit deleted successfully')
     );
   });
+
+  recordMeterReading = asyncHandler(async (req, res) => {
+    const reading = await unitService.recordMeterReading(
+      req.params.id,
+      req.body,
+      req.user
+    );
+    res.status(201).json(
+      new ApiResponse(201, reading, 'Meter reading recorded and calculated successfully')
+    );
+  });
+
+  getMeterReadings = asyncHandler(async (req, res) => {
+    const data = await unitService.getMeterReadings(req.params.id, req.user);
+    res.status(200).json(
+      new ApiResponse(200, data, 'Meter readings retrieved successfully')
+    );
+  });
 }
 
 export const unitController = new UnitController();

@@ -1,5 +1,6 @@
 import { unitRepository } from './unit.repository.js';
 import { propertyRepository } from '../properties/property.repository.js';
+import { prisma } from '../../config/database.config.js';
 import { ApiError } from '../../common/errors/apiError.js';
 import { getUserScope } from '../../common/utils/scopeHelper.js';
 
@@ -107,6 +108,142 @@ export class UnitService {
   async deleteUnit(id, user) {
     await this.getUnit(id, user);
     return unitRepository.delete(id);
+  }
+
+  /**
+   * Record Utility Sub-Meter Reading (Electricity / Water)
+   * -------------------------------------------------------------------------
+   * [Hinglish / Hindi-English Explanation]:
+   * Unit ka current bijli ya paani meter reading record karta hai:
+   * 1. Rate Landlord ki Organization Settings se auto-fetch hoti hai (`electricityRate` / `waterRate`).
+   * 2. Units Consumed = currentReading - previousReading.
+   * 3. Total Due = consumedUnits * ratePerUnit.
+   * 4. Agar attachToPayment true ho toh tenant ke payment me utility amount link ho jati hai.
+   */
+  async recordMeterReading(unitId, payload, user) {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        property: {
+          include: {
+            organization: true,
+          },
+        },
+        meterReadings: {
+          where: { utilityType: payload.utilityType || 'ELECTRICITY' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!unit) {
+      throw new ApiError(404, 'Unit not found');
+    }
+
+    const currentReading = parseFloat(payload.currentReading);
+    if (isNaN(currentReading) || currentReading < 0) {
+      throw new ApiError(400, 'A valid current meter reading (>= 0) is required.');
+    }
+
+    // Auto-fetch previous reading if not provided
+    const lastReading = unit.meterReadings?.[0];
+    const previousReading =
+      payload.previousReading !== undefined && !isNaN(parseFloat(payload.previousReading))
+        ? parseFloat(payload.previousReading)
+        : (lastReading?.currentReading || 0);
+
+    if (currentReading < previousReading) {
+      throw new ApiError(400, `Current reading (${currentReading}) cannot be less than previous reading (${previousReading}).`);
+    }
+
+    const utilityType = payload.utilityType || 'ELECTRICITY';
+
+    // Fetch rate from Organization settings or fallback
+    const org = unit.property?.organization;
+    let ratePerUnit;
+    if (payload.customRate !== undefined && !isNaN(parseFloat(payload.customRate))) {
+      ratePerUnit = parseFloat(payload.customRate);
+    } else {
+      ratePerUnit = utilityType === 'WATER'
+        ? (org?.waterRate ?? 20.0)
+        : (org?.electricityRate ?? 9.0);
+    }
+
+    const consumedUnits = Math.round((currentReading - previousReading) * 100) / 100;
+    const amount = Math.round((consumedUnits * ratePerUnit) * 100) / 100;
+    const readingMonth = payload.readingMonth || new Date().toISOString().slice(0, 7);
+
+    const record = await prisma.meterReading.create({
+      data: {
+        unitId,
+        utilityType,
+        readingMonth,
+        previousReading,
+        currentReading,
+        consumedUnits,
+        ratePerUnit,
+        amount,
+        status: payload.status || 'BILLED',
+        notes: payload.notes || null,
+      },
+      include: {
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+            floor: true,
+            propertyId: true,
+          },
+        },
+      },
+    });
+
+    return record;
+  }
+
+  async getMeterReadings(unitId, user) {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        property: {
+          include: {
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                electricityRate: true,
+                waterRate: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!unit) {
+      throw new ApiError(404, 'Unit not found');
+    }
+
+    const readings = await prisma.meterReading.findMany({
+      where: { unitId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    return {
+      unit: {
+        id: unit.id,
+        unitNumber: unit.unitNumber,
+        propertyTitle: unit.property?.title,
+        propertyId: unit.propertyId,
+        organizationRates: {
+          electricityRate: unit.property?.organization?.electricityRate ?? 9.0,
+          waterRate: unit.property?.organization?.waterRate ?? 20.0,
+        },
+      },
+      readings,
+    };
   }
 }
 

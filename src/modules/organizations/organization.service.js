@@ -401,6 +401,48 @@ export class OrganizationService {
       permissionKeys,
     });
   }
+
+  /**
+   * Update Organization Utility Billing Rates (Electricity & Water)
+   * -------------------------------------------------------------------------
+   * [Hinglish / Hindi-English Explanation]:
+   * Landlord apni organization ke liye per-unit electricity rate (₹/kWh) aur
+   * water rate (₹/kL) configure kar sakta hai. Yehi rate har flat/unit ke
+   * meter reading hisaab me automatically use hota hai.
+   */
+  async updateUtilityRates(organizationId, { electricityRate, waterRate }, user) {
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+    if (!org) {
+      throw new ApiError(404, 'Organization not found');
+    }
+
+    if (user && !user.isSuperAdmin && user.adminRole !== 'SUPER_ADMIN' && org.ownerId !== user.id) {
+      throw new ApiError(403, 'Forbidden: Only the organization owner can configure utility billing rates.');
+    }
+
+    const data = {};
+    if (electricityRate !== undefined && !isNaN(Number(electricityRate))) {
+      data.electricityRate = Math.max(0, Number(electricityRate));
+    }
+    if (waterRate !== undefined && !isNaN(Number(waterRate))) {
+      data.waterRate = Math.max(0, Number(waterRate));
+    }
+
+    return prisma.organization.update({
+      where: { id: organizationId },
+      data,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        electricityRate: true,
+        waterRate: true,
+        updatedAt: true,
+      },
+    });
+  }
 }
 
 export const organizationService = new OrganizationService();

@@ -45,4 +45,9 @@ router.post(
   organizationController.createRole
 );
 
+router.patch(
+  '/:id/utility-rates',
+  organizationController.updateUtilityRates
+);
+
 export default router;
