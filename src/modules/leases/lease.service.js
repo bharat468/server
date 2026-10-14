@@ -67,7 +67,22 @@ export class LeaseService {
     return lease;
   }
 
-  // Deterministic Penalty Calculation Engine (BRD Section 13 & 14, TRD Section 21 & 22)
+  /**
+   * --------------------------------------------------------------------------
+   * evaluateSchedulesPenalty(lease)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * Deterministic Penalty Calculation Engine (BRD Section 13 & 14):
+   * 1. Lease ke rentRule (graceDays, penaltyType, penaltyAmount, maxPenaltyCap) ko evaluate karta hai.
+   * 2. Agar current date > (dueDate + graceDays) hai:
+   *    - overdue days = today - dueDate.
+   *    - Penalty calculate hoti hai ('PER_DAY', 'FIXED', ya 'PERCENTAGE').
+   *    - Maximum penalty cap ceiling lagti hai (maxPenaltyCap se zyada penalty kabhi nahi lagti).
+   *    - Schedule status 'OVERDUE' update hota hai.
+   * 3. Agar dueDate aa gayi hai lekin graceDays ke andar hai -> status 'DUE' banta hai (no penalty).
+   * 
+   * @param {Object} lease - Lease with rentRule & schedules
+   */
   async evaluateSchedulesPenalty(lease) {
     const rule = lease.rentRule;
     if (!rule) return;
@@ -116,6 +131,23 @@ export class LeaseService {
     }
   }
 
+  /**
+   * --------------------------------------------------------------------------
+   * paySchedule(scheduleId, { amount, paidOn }, user)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * Rent Schedule par payment record karta hai.
+   * 
+   * Flow & Security:
+   * 1. Amount validation (> 0).
+   * 2. Multi-tenant Scope check: Sirf associated Tenant ya Property Owner/Admin hi payment record kar sakte hain.
+   * 3. Partial payment vs Full payment settlement calculate karta hai.
+   * 4. Agar total dues cover ho gaye toh status 'PAID', varna 'PARTIALLY_PAID'.
+   * 
+   * @param {string} scheduleId - RentSchedule ID
+   * @param {{ amount: number, paidOn?: string }} paymentData
+   * @param {Object} user - Authenticated user context
+   */
   async paySchedule(scheduleId, { amount, paidOn }, user) {
     if (!amount || amount <= 0) {
       throw new ApiError(400, 'Payment amount must be greater than 0');

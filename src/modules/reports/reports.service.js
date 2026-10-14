@@ -33,7 +33,24 @@ export class ReportsService {
   }
 
   /**
-   * 1. Monthly Rent Collection Report (BRD Sec 25.1)
+   * ==========================================================================
+   * 1. getMonthlyRentCollections({ month, propertyId }, user)
+   * ==========================================================================
+   * BRD Section 25.1 — Monthly Rent Collection Report:
+   * Function Purpose:
+   * Kisi specific billing month (ya all months) aur property ke liye rent collections calculate karta hai.
+   * 
+   * Calculations & Metrics:
+   * 1. totalCollected = sum of all 'PAID' payments.
+   * 2. totalPending = sum of all 'PENDING' payments.
+   * 3. totalOverdue = sum of all 'OVERDUE' payments.
+   * 4. totalExpected = totalCollected + totalPending + totalOverdue.
+   * 5. collectionRate = Math.round((totalCollected / totalExpected) * 100)% (handles zero expected).
+   * 6. Multi-Tenant: Sirf user ke authorized organization/properties ka data include hota hai.
+   * 
+   * @param {{ month?: string, propertyId?: string }} filters
+   * @param {Object} user - Authenticated user context
+   * @returns {Promise<{ summary: Object, items: Array }>}
    */
   async getMonthlyRentCollections({ month, propertyId }, user) {
     const whereProperty = await this.getScopedPropertyWhere(user);
@@ -105,7 +122,21 @@ export class ReportsService {
   }
 
   /**
-   * 2. Pending Defaulters List (BRD Sec 25.2)
+   * ==========================================================================
+   * 2. getDefaultersReport(user)
+   * ==========================================================================
+   * BRD Section 25.2 — Pending Defaulters Ledger:
+   * Function Purpose:
+   * Sabhi tenants ki overdue aur pending payments ko scan karke rank-ordered defaulters list banata hai.
+   * 
+   * Calculations & Logic:
+   * 1. RentSchedules aur Payment records dono se unpaid entries combine karta hai.
+   * 2. daysOverdue = today - dueDate.
+   * 3. totalOutstanding = baseAmount + penaltyAmount.
+   * 4. Sorting: Highest days overdue aur highest outstanding amount wale defaulters sabse upar sort hote hain.
+   * 
+   * @param {Object} user - Authenticated user context
+   * @returns {Promise<{ summary: Object, items: Array }>}
    */
   async getDefaultersReport(user) {
     const whereProperty = await this.getScopedPropertyWhere(user);
@@ -229,7 +260,23 @@ export class ReportsService {
   }
 
   /**
-   * 3. Property-wise Profit & Loss / Expense Report (BRD Sec 25.3)
+   * ==========================================================================
+   * 3. getPropertyProfitAndLossReport(user)
+   * ==========================================================================
+   * BRD Section 25.3 — Property-wise Profit & Loss / Expense Report:
+   * Function Purpose:
+   * Har property asset ka revenue, pending rent, maintenance expenses, aur net operating profit calculate karta hai.
+   * 
+   * Financial Formulas:
+   * 1. grossIncome = sum of 'PAID' payments for that property.
+   * 2. pendingReceivables = sum of 'PENDING' + 'OVERDUE' payments.
+   * 3. totalExpenses = sum of estimatedCost for all maintenance tickets.
+   * 4. netProfit = grossIncome - totalExpenses.
+   * 5. profitMargin = grossIncome > 0 ? Math.round((netProfit / grossIncome) * 100) : (netProfit < 0 ? -100 : 0)%.
+   * 6. Occupancy Stats: totalUnits, occupiedUnits, vacantUnits.
+   * 
+   * @param {Object} user - Authenticated user context
+   * @returns {Promise<{ summary: Object, items: Array }>}
    */
   async getPropertyProfitAndLossReport(user) {
     const whereProperty = await this.getScopedPropertyWhere(user);

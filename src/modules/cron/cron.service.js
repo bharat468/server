@@ -1,11 +1,36 @@
 import { prisma } from '../../config/database.config.js';
 import { logger } from '../../common/logger/logger.js';
 
+/**
+ * ============================================================================
+ * CRON SERVICE — AUTOMATED LIFECYCLE ENGINE (BRD Sec 13, 14 & 26)
+ * ============================================================================
+ * Yeh service pure system ka automatic background engine hai.
+ * Iska main kaam:
+ * 1. Rent Schedules ko track karna (UPCOMING -> DUE -> OVERDUE status change karna).
+ * 2. Grace Period ke baad late fee / penalty calculate karna (per-day, fixed, ya percentage).
+ * 3. Max penalty cap ensure karna taaki extra penalty charge na ho.
+ * 4. Expired SaaS subscriptions ko auto-expire karna.
+ */
 export class CronService {
   /**
-   * Evaluates all unpaid RentSchedules across all active leases.
-   * Auto-promotes UPCOMING -> DUE -> OVERDUE and calculates escalating late penalties.
-   * Supports `asOfDate` for deterministic cron runs & simulation testing.
+   * --------------------------------------------------------------------------
+   * 1. evaluateRentSchedules(asOfDate)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * Sabhi active leases ke unpaid rent schedules ko scan karta hai.
+   * 
+   * Flow & Logic:
+   * 1. Today >= DueDate && < GraceEnd -> Schedule status 'DUE' banta hai.
+   * 2. Today > GracePeriodEnd -> Schedule status 'OVERDUE' banta hai aur late fee calculate hoti hai.
+   * 3. Penalty Formulas:
+   *    - 'PER_DAY': daysLate * penaltyAmount
+   *    - 'FIXED': penaltyAmount (one-time fee)
+   *    - 'PERCENTAGE': (penaltyAmount / 100) * schedule.amount
+   * 4. Ceiling Check: Agar calculated penalty > maxPenaltyCap hai, toh maxPenaltyCap lagti hai.
+   * 
+   * @param {Date} [asOfDate=new Date()] - Deterministic testing & simulation ke liye date parameter
+   * @returns {Promise<Object>} Promoted schedules count aur total penalty assessed
    */
   async evaluateRentSchedules(asOfDate = new Date()) {
     const today = new Date(asOfDate);
@@ -55,6 +80,7 @@ export class CronService {
             calculatedPenalty = (penaltyAmount / 100) * Number(schedule.amount);
           }
 
+          // Safety Cap: Penalty max cap ceiling se zyada nahi ho sakti
           if (maxCap > 0 && calculatedPenalty > maxCap) {
             calculatedPenalty = maxCap;
           }
@@ -92,8 +118,15 @@ export class CronService {
   }
 
   /**
-   * Scans Organization Subscriptions and expires any accounts past their endDate / expiresAt.
-   * Auto-promotes ACTIVE / TRIAL -> EXPIRED.
+   * --------------------------------------------------------------------------
+   * 2. evaluateSubscriptionExpirations(asOfDate)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * Sabhi Organizations ke SaaS Plans & Subscriptions scan karta hai.
+   * Agar kisi organization ka plan expire ho gaya hai, toh status 'EXPIRED' karta hai.
+   * 
+   * @param {Date} [asOfDate=new Date()]
+   * @returns {Promise<Object>} Expired subscriptions summary
    */
   async evaluateSubscriptionExpirations(asOfDate = new Date()) {
     const today = new Date(asOfDate);
@@ -132,8 +165,15 @@ export class CronService {
   }
 
   /**
-   * Master Daily Lifecycle Cron Job:
-   * Runs overdue penalty evaluation and subscription expiration checks.
+   * --------------------------------------------------------------------------
+   * 3. runDailyLifecycleCron(asOfDate)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * Master execution function jo dono jobs (Rent schedules + Subscription expirations)
+   * ko parallel me execute karta hai aur detailed execution telemetry log karta hai.
+   * 
+   * @param {Date} [asOfDate=new Date()]
+   * @returns {Promise<Object>} Complete cron execution summary report
    */
   async runDailyLifecycleCron(asOfDate = new Date()) {
     const startTime = Date.now();

@@ -14,10 +14,27 @@ export class AuthService {
     this.userRepo = userRepo;
   }
 
+  /**
+   * 6-digit random cryptographic OTP generator.
+   * Format: 100000 to 999999
+   */
   generateOtp() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
+  /**
+   * --------------------------------------------------------------------------
+   * generateTokens(user, additionalClaims)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * User ke liye JWT Access Token aur Refresh Token sign karta hai.
+   * Access Token ki expiry database system settings se dynamic hoti hai (default 15m),
+   * aur Refresh Token 7 din ke liye valid hota hai.
+   * 
+   * @param {Object} user - User record (id, mobile, status)
+   * @param {Object} [additionalClaims={}] - Role, permissions, isSuperAdmin claims
+   * @returns {{ accessToken: string, refreshToken: string }}
+   */
   generateTokens(user, additionalClaims = {}) {
     const payload = {
       id: user.id,
@@ -47,6 +64,16 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
+  /**
+   * --------------------------------------------------------------------------
+   * lookup(mobile)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * Login screen se pehle check karta hai ki mobile number registered hai ya nahi,
+   * aur user ka role & primary organization preview return karta hai.
+   * 
+   * @param {string} mobile - 10-digit Indian phone number
+   */
   async lookup(mobile) {
     if (!mobile || !/^\d{10}$/.test(mobile)) {
       throw new ApiError(400, 'Please provide a valid 10-digit mobile number');
@@ -105,6 +132,20 @@ export class AuthService {
     };
   }
 
+  /**
+   * --------------------------------------------------------------------------
+   * sendOtp(mobile)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * 1. 10-digit mobile number format validate karta hai.
+   * 2. Security Check: Dekhta hai ki user pre-registered hai ya nahi (zero-trust).
+   * 3. Suspension Check: Suspended users ko block karta hai (403 Forbidden).
+   * 4. 6-digit cryptographic OTP generate karke database me expiry ke sath save karta hai.
+   * 5. Dev Mode: Terminal console me print karta hai (Prod me SMS Gateway hook hoga).
+   * 
+   * @param {string} mobile - Registered 10-digit mobile number
+   * @returns {Promise<Object>} Expiration window, devOtp, and isSuperAdmin flag
+   */
   async sendOtp(mobile) {
     if (!mobile || !/^\d{10}$/.test(mobile)) {
       throw new ApiError(400, 'Please provide a valid 10-digit mobile number');
@@ -159,6 +200,24 @@ export class AuthService {
     };
   }
 
+  /**
+   * --------------------------------------------------------------------------
+   * verifyOtp(mobile, otp)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * User dwara bheje gaye 6-digit OTP ko verify karta hai.
+   * 
+   * Flow & Logic:
+   * 1. Database me check karta hai ki OTP valid aur non-expired hai ya nahi.
+   * 2. Replay-attack prevention: OTP ko immediately `used: true` mark karta hai.
+   * 3. User roles, permissions aur active organizations evaluate karta hai.
+   * 4. SuperAdmin vs Landlord vs Tenant role detect karta hai.
+   * 5. JWT Access Token & Refresh Token issue karke authenticated profile return karta hai.
+   * 
+   * @param {string} mobile
+   * @param {string} otp - 6 digit code
+   * @returns {Promise<Object>} User data, accessToken, refreshToken
+   */
   async verifyOtp(mobile, otp) {
     const validOtp = await this.authRepo.findValidOtp(mobile, otp);
 
@@ -228,6 +287,20 @@ export class AuthService {
     };
   }
 
+  /**
+   * --------------------------------------------------------------------------
+   * calculateUserPermissions(userId, organizationId)
+   * --------------------------------------------------------------------------
+   * Function Purpose:
+   * Multi-Tenant RBAC Permissions Calculator:
+   * 1. SuperAdmin Detection: Agar user superadmin hai toh platformPermissions = ['*'] aur permissions = ['*'].
+   * 2. Organization Ownership: Agar user organization ka owner hai, toh use saari tenant permissions automatically grant hoti hain.
+   * 3. Staff / Member RBAC: UserRoles se fine-grained permissions (property.create, tenant.read, finance.export, etc.) fetch karta hai.
+   * 
+   * @param {string} userId - User ID
+   * @param {string} [organizationId=null] - Target organization workspace ID
+   * @returns {Promise<{ permissions: string[], platformPermissions: string[] }>}
+   */
   async calculateUserPermissions(userId, organizationId = null) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
