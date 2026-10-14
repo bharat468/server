@@ -3,9 +3,25 @@ import { prisma } from '../../config/database.config.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
- * Plan Quota & Expiry Middleware Guard
- * Enforces dynamic SaaS plan limits and subscription expiration dates.
- * @param {'properties' | 'staff'} quotaType
+ * Plan Quota & Subscription Expiry Middleware Guard
+ * -------------------------------------------------------------------------
+ * [Hinglish / Hindi-English Explanation]:
+ * Yeh middleware guard multi-tenant SaaS business rules enforce karta hai:
+ * 1. SuperAdmin Bypass: SuperAdmin ya platform admin ko saare quotas bypass hote hain.
+ * 2. Organization Discovery: User kis organization me add kar raha hai, usko resolve karta hai.
+ * 3. Subscription Status & Expiration: Check karta hai ki plan SUSPENDED ya EXPIRED toh nahi hai,
+ *    aur end date Date.now() se pehle toh nahi nikal chuki.
+ * 4. Quota Limits: Agar quotaType 'properties' hai toh `maxProperties` check karta hai;
+ *    agar 'staff' hai toh `maxStaff` check karta hai. Quota exceed hone par clear 403 Forbidden deta hai.
+ * 
+ * [English Explanation]:
+ * Enforces dynamic SaaS plan limits, operational quotas, and subscription expiration.
+ * - Resolves target tenant organization via route parameters, body or membership table.
+ * - Verifies current timestamp against subscription end date / expiration threshold.
+ * - Queries live resource consumption (properties, team staff) against plan allowance.
+ * 
+ * @param {'properties' | 'staff'} quotaType - The resource type being provisioned
+ * @returns {import('express').RequestHandler} Express middleware function
  */
 export const checkPlanQuota = (quotaType) =>
   asyncHandler(async (req, _res, next) => {

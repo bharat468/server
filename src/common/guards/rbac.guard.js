@@ -3,6 +3,29 @@ import { prisma } from '../../config/database.config.js';
 import { ApiError } from '../errors/apiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
+/**
+ * Granular Role-Based Access Control (RBAC) & Property Scoping Guard
+ * -------------------------------------------------------------------------
+ * [Hinglish / Hindi-English Explanation]:
+ * Yeh guard har API endpoint par check karta hai ki user ke paas required permission hai ya nahi:
+ * 1. Organization Resolution: Pehle `x-organization-id` header ya fallback database lookup se active org nikalta hai.
+ * 2. SuperAdmin & Owner Privilege: Agar user SuperAdmin hai ya organization ka direct owner hai,
+ *    toh usse automatically full bypass milta hai bina extra DB permission check ke.
+ * 3. Role & Permission Verification: Staff/manager ke case me `rbacRepository.getUserPermissionsWithScope`
+ *    call karke check karta hai ki required `permissionKey` user ke assigned role me hai ya nahi.
+ * 4. Property Scope Lockdown: Agar kisi manager ko sirf specific property ka access mila hai
+ *    (`propertyScope`), toh woh kisi doosri property ko access/modify nahi kar sakta (403 Forbidden).
+ * 
+ * [English Explanation]:
+ * Enterprise RBAC and granular property-level isolation middleware.
+ * - Extracts and establishes tenant context (`req.organizationId`).
+ * - Grants immediate bypass for SuperAdmins and organization owners.
+ * - Evaluates role permissions against requested `permissionKey`.
+ * - Restricts staff access to assigned property subsets via `req.propertyScope`.
+ * 
+ * @param {string} permissionKey - Unique permission string (e.g. 'property.create', 'lease.view')
+ * @returns {import('express').RequestHandler} Express middleware function
+ */
 export const requirePermission = (permissionKey) => {
   return asyncHandler(async (req, _res, next) => {
     const user = req.user;
