@@ -29,7 +29,7 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
   }
 
   if (user.status !== 'ACTIVE') {
-    throw new ApiError(403, `Your account is currently ${user.status.toLowerCase()}. Please contact support.`);
+    throw new ApiError(401, `Your account is currently ${user.status.toLowerCase()}. Please contact support.`);
   }
 
   req.user = user;

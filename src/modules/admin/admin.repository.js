@@ -167,8 +167,21 @@ export class AdminRepository {
   }
 
   async deleteUser(userId) {
-    return prisma.user.delete({
-      where: { id: userId },
+    return prisma.$transaction(async (tx) => {
+      // 1. Remove user role mappings
+      await tx.userRole.deleteMany({
+        where: { userId },
+      });
+
+      // 2. Remove organization memberships
+      await tx.organizationMember.deleteMany({
+        where: { userId },
+      });
+
+      // 3. Delete user record
+      return tx.user.delete({
+        where: { id: userId },
+      });
     });
   }
 

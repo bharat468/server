@@ -139,17 +139,19 @@ async function main() {
   console.log('✓ Seeded system roles (Owner, Property Manager, Accountant)');
 
   // 3. Platform SuperAdmin & Demo Organization
-  await prisma.user.upsert({
-    where: { mobile: '8003953815' },
+  const superAdmin = await prisma.user.upsert({
+    where: { mobile: '9876543210' },
     update: {
+      name: 'SuperAdmin Master',
+      email: 'admin@rentmate.local',
+      status: 'ACTIVE',
       isSuperAdmin: true,
       adminRole: 'SUPER_ADMIN',
-      status: 'ACTIVE',
     },
     create: {
-      mobile: '8003953815',
+      mobile: '9876543210',
       name: 'SuperAdmin Master',
-      email: 'master@rentmate.local',
+      email: 'admin@rentmate.local',
       status: 'ACTIVE',
       isSuperAdmin: true,
       adminRole: 'SUPER_ADMIN',
@@ -157,15 +159,21 @@ async function main() {
   });
 
   const owner = await prisma.user.upsert({
-    where: { mobile: '9876543210' },
-    update: {},
+    where: { mobile: '8003953815' },
+    update: {
+      name: 'Bharat',
+      email: 'bharat@rentmate.local',
+      status: 'ACTIVE',
+      isSuperAdmin: false,
+      adminRole: null,
+    },
     create: {
-      mobile: '9876543210',
+      mobile: '8003953815',
       email: 'bharat@rentmate.local',
       name: 'Bharat',
       status: 'ACTIVE',
-      isSuperAdmin: true,
-      adminRole: 'SUPER_ADMIN',
+      isSuperAdmin: false,
+      adminRole: null,
     },
   });
 

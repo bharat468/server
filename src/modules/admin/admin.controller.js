@@ -3,6 +3,7 @@ import { cronService } from '../cron/cron.service.js';
 import { ApiResponse } from '../../common/utils/apiResponse.js';
 import { asyncHandler } from '../../common/utils/asyncHandler.js';
 import { ApiError } from '../../common/errors/apiError.js';
+import { prisma } from '../../config/database.config.js';
 
 export class AdminController {
   listUsers = asyncHandler(async (_req, res) => {
@@ -16,6 +17,25 @@ export class AdminController {
     const { mobile, name, email, roleId, organizationId, propertyScope } = req.body;
     if (!mobile || !/^\d{10}$/.test(mobile)) {
       throw new ApiError(400, 'Valid 10-digit mobile number is required');
+    }
+
+    // Check if user already exists
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { mobile },
+          ...(email ? [{ email }] : [])
+        ]
+      }
+    });
+
+    if (existing) {
+      if (existing.mobile === mobile) {
+        throw new ApiError(409, `A user with mobile number '${mobile}' is already registered.`);
+      }
+      if (email && existing.email === email) {
+        throw new ApiError(409, `A user with email '${email}' is already registered.`);
+      }
     }
 
     const user = await adminRepository.createUser({
@@ -38,7 +58,17 @@ export class AdminController {
       throw new ApiError(400, 'Invalid status value');
     }
 
-    const updated = await adminRepository.updateUserStatus(req.params.id, status);
+    const targetUserId = req.params.id;
+    if (req.user.id === targetUserId && status !== 'ACTIVE') {
+      throw new ApiError(400, 'Security violation: You cannot deactivate or suspend your own active administrator account.');
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (targetUser && targetUser.mobile === '9876543210' && status !== 'ACTIVE') {
+      throw new ApiError(403, 'The root SuperAdmin Master account status cannot be modified.');
+    }
+
+    const updated = await adminRepository.updateUserStatus(targetUserId, status);
     res.status(200).json(
       new ApiResponse(200, updated, 'User status updated successfully')
     );
@@ -53,7 +83,43 @@ export class AdminController {
   });
 
   deleteUser = asyncHandler(async (req, res) => {
-    await adminRepository.deleteUser(req.params.id);
+    const targetUserId = req.params.id;
+
+    if (req.user.id === targetUserId) {
+      throw new ApiError(400, 'Security violation: You cannot delete your own active administrator account.');
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      include: {
+        ownedOrganizations: true,
+        tenantLeases: { where: { status: 'ACTIVE' } },
+      },
+    });
+
+    if (!targetUser) {
+      throw new ApiError(404, 'The requested user does not exist or has already been deleted.');
+    }
+
+    if (targetUser.mobile === '9876543210' || (targetUser.isSuperAdmin && targetUser.adminRole === 'SUPER_ADMIN')) {
+      throw new ApiError(403, 'The root SuperAdmin Master account is immutable and protected from deletion.');
+    }
+
+    if (targetUser.ownedOrganizations && targetUser.ownedOrganizations.length > 0) {
+      throw new ApiError(
+        400,
+        `Cannot delete user '${targetUser.name || targetUser.mobile}': This user is registered as the active Owner of organization '${targetUser.ownedOrganizations[0].name}'. Please transfer or remove organization ownership first.`
+      );
+    }
+
+    if (targetUser.tenantLeases && targetUser.tenantLeases.length > 0) {
+      throw new ApiError(
+        400,
+        `Cannot delete user '${targetUser.name || targetUser.mobile}': User has ${targetUser.tenantLeases.length} active tenant rental lease agreement(s). Terminate or archive the leases first.`
+      );
+    }
+
+    await adminRepository.deleteUser(targetUserId);
     res.status(200).json(
       new ApiResponse(200, null, 'User deleted successfully')
     );
