@@ -10,8 +10,11 @@ router.use(authenticate);
 router.get('/my-rentals', leaseController.listMyRentals);
 
 // Owner list of leases
+router.get('/expiring-alerts', leaseController.getExpiring);
 router.get('/', leaseController.listOwner);
 router.get('/:id', leaseController.get);
+router.post('/:id/renew', leaseController.renew);
+router.post('/:id/terminate', leaseController.terminate);
 router.post('/schedules/:scheduleId/pay', leaseController.paySchedule);
 
 export default router;

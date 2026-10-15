@@ -166,10 +166,63 @@ export class CronService {
 
   /**
    * --------------------------------------------------------------------------
-   * 3. runDailyLifecycleCron(asOfDate)
+   * 3. evaluateLeaseExpirations(asOfDate)
    * --------------------------------------------------------------------------
-   * Function Purpose:
-   * Master execution function jo dono jobs (Rent schedules + Subscription expirations)
+   * Scans active leases and promotes status:
+   * - If today > endDate -> 'EXPIRED'
+   * - If today <= endDate && endDate <= today + 30 days -> 'EXPIRING'
+   */
+  async evaluateLeaseExpirations(asOfDate = new Date()) {
+    const today = new Date(asOfDate);
+    const thirtyDaysAhead = new Date(today);
+    thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30);
+
+    // 1. Mark expired leases
+    const expiredLeases = await prisma.lease.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'EXPIRING'] },
+        endDate: { lt: today },
+      },
+    });
+
+    let expiredCount = 0;
+    for (const lease of expiredLeases) {
+      await prisma.lease.update({
+        where: { id: lease.id },
+        data: { status: 'EXPIRED' },
+      });
+      expiredCount++;
+    }
+
+    // 2. Mark expiring leases (within 30 days)
+    const expiringLeases = await prisma.lease.findMany({
+      where: {
+        status: 'ACTIVE',
+        endDate: { gte: today, lte: thirtyDaysAhead },
+      },
+    });
+
+    let expiringCount = 0;
+    for (const lease of expiringLeases) {
+      await prisma.lease.update({
+        where: { id: lease.id },
+        data: { status: 'EXPIRING' },
+      });
+      expiringCount++;
+    }
+
+    return {
+      evaluatedAt: today.toISOString(),
+      leasesMarkedExpired: expiredCount,
+      leasesMarkedExpiring: expiringCount,
+    };
+  }
+
+  /**
+   * --------------------------------------------------------------------------
+   * 4. runDailyLifecycleCron(asOfDate)
+   * --------------------------------------------------------------------------
+   * Master execution function jo sabhi jobs (Rent schedules + Subscription expirations + Lease expirations)
    * ko parallel me execute karta hai aur detailed execution telemetry log karta hai.
    * 
    * @param {Date} [asOfDate=new Date()]
@@ -179,9 +232,10 @@ export class CronService {
     const startTime = Date.now();
     logger.info({ asOfDate }, '[CronService] Starting daily lifecycle evaluation job...');
 
-    const [rentResults, subResults] = await Promise.all([
+    const [rentResults, subResults, leaseResults] = await Promise.all([
       this.evaluateRentSchedules(asOfDate),
       this.evaluateSubscriptionExpirations(asOfDate),
+      this.evaluateLeaseExpirations(asOfDate),
     ]);
 
     const durationMs = Date.now() - startTime;
@@ -191,6 +245,7 @@ export class CronService {
       timestamp: new Date().toISOString(),
       rentEvaluation: rentResults,
       subscriptionEvaluation: subResults,
+      leaseEvaluation: leaseResults,
     };
 
     logger.info(summary, '[CronService] Daily lifecycle evaluation job completed successfully');

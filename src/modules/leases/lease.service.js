@@ -190,6 +190,170 @@ export class LeaseService {
       paidOn: paidOn ? new Date(paidOn) : new Date(),
     });
   }
+
+  /**
+   * --------------------------------------------------------------------------
+   * getExpiringLeases(user)
+   * --------------------------------------------------------------------------
+   * Fetches leases expiring within the next 30 days (or already expired).
+   */
+  async getExpiringLeases(user) {
+    const scope = await getUserScope(user);
+    const now = new Date();
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() + 30); // 30 days ahead
+
+    const where = {
+      status: { in: ['ACTIVE', 'EXPIRING', 'EXPIRED'] },
+      endDate: { lte: thresholdDate },
+    };
+
+    if (!scope.isSuperAdmin) {
+      where.property = {
+        OR: [
+          { organizationId: { in: scope.orgIds } },
+          { ownerId: user.id },
+          { createdById: user.id },
+        ],
+      };
+      if (scope.propertyScope.length > 0) {
+        where.propertyId = { in: scope.propertyScope };
+      }
+    }
+
+    const leases = await prisma.lease.findMany({
+      where,
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            address: true,
+            city: true,
+            organizationId: true,
+            ownerId: true,
+            organization: true,
+            owner: {
+              select: { id: true, name: true, mobile: true, email: true },
+            },
+          },
+        },
+        unit: true,
+        tenant: {
+          select: { id: true, name: true, mobile: true, email: true },
+        },
+        rentRule: true,
+      },
+      orderBy: { endDate: 'asc' },
+    });
+
+    return leases.map((l) => {
+      const end = new Date(l.endDate);
+      const diffTime = end.getTime() - now.getTime();
+      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return {
+        ...l,
+        daysRemaining,
+        isExpired: daysRemaining <= 0,
+      };
+    });
+  }
+
+  /**
+   * --------------------------------------------------------------------------
+   * renewLease(id, { escalationPercentage, newMonthlyRent, durationMonths }, user)
+   * --------------------------------------------------------------------------
+   * Renews an existing lease with optional rent hike and generates upcoming schedules.
+   */
+  async renewLease(id, { escalationPercentage, newMonthlyRent, durationMonths = 11 } = {}, user) {
+    const lease = await this.getLease(id, user);
+
+    let escalatedRent = Number(lease.monthlyRent);
+    if (newMonthlyRent && Number(newMonthlyRent) > 0) {
+      escalatedRent = Number(newMonthlyRent);
+    } else if (escalationPercentage && Number(escalationPercentage) > 0) {
+      escalatedRent = Math.round(Number(lease.monthlyRent) * (1 + Number(escalationPercentage) / 100));
+    }
+
+    const currentEnd = new Date(lease.endDate);
+    const now = new Date();
+    const newStartDate = currentEnd > now ? currentEnd : now;
+    const newEndDate = new Date(newStartDate);
+    newEndDate.setMonth(newEndDate.getMonth() + Number(durationMonths || 11));
+
+    // Update lease
+    await prisma.lease.update({
+      where: { id },
+      data: {
+        monthlyRent: escalatedRent,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        status: 'ACTIVE',
+      },
+    });
+
+    // Also update Unit rentAmount
+    if (lease.unitId) {
+      await prisma.unit.update({
+        where: { id: lease.unitId },
+        data: { rentAmount: escalatedRent },
+      });
+    }
+
+    // Generate upcoming rent schedules for the renewal term
+    const dueDay = lease.rentRule?.dueDay || 5;
+    const monthsToGenerate = Math.min(Number(durationMonths || 11), 6);
+    for (let i = 0; i < monthsToGenerate; i++) {
+      const schedDate = new Date(newStartDate.getFullYear(), newStartDate.getMonth() + i, dueDay, 12, 0, 0);
+      const periodName = schedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      const exists = await prisma.rentSchedule.findFirst({
+        where: { leaseId: id, period: periodName },
+      });
+
+      if (!exists) {
+        await prisma.rentSchedule.create({
+          data: {
+            leaseId: id,
+            period: periodName,
+            dueDate: schedDate,
+            amount: escalatedRent,
+            paidAmount: 0,
+            penaltyAmount: 0,
+            status: 'UPCOMING',
+          },
+        });
+      }
+    }
+
+    return this.getLease(id, user);
+  }
+
+  /**
+   * --------------------------------------------------------------------------
+   * terminateLease(id, { reason }, user)
+   * --------------------------------------------------------------------------
+   */
+  async terminateLease(id, { reason } = {}, user) {
+    const lease = await this.getLease(id, user);
+
+    const terminated = await prisma.lease.update({
+      where: { id },
+      data: {
+        status: 'TERMINATED',
+        terms: reason ? `${lease.terms || ''}\n[Terminated]: ${reason}` : lease.terms,
+      },
+    });
+
+    if (lease.unitId) {
+      await prisma.unit.update({
+        where: { id: lease.unitId },
+        data: { status: 'VACANT' },
+      });
+    }
+
+    return terminated;
+  }
 }
 
 export const leaseService = new LeaseService();

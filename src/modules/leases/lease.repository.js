@@ -61,7 +61,14 @@ export class LeaseRepository {
     return prisma.lease.findUnique({
       where: { id },
       include: {
-        property: true,
+        property: {
+          include: {
+            organization: true,
+            owner: {
+              select: { id: true, name: true, mobile: true, email: true },
+            },
+          },
+        },
         unit: true,
         tenant: {
           select: { id: true, name: true, mobile: true, email: true },

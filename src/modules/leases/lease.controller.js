@@ -30,6 +30,27 @@ export class LeaseController {
       new ApiResponse(200, result, 'Rent payment recorded successfully')
     );
   });
+
+  getExpiring = asyncHandler(async (req, res) => {
+    const expiring = await leaseService.getExpiringLeases(req.user);
+    res.status(200).json(
+      new ApiResponse(200, expiring, 'Expiring leases retrieved successfully')
+    );
+  });
+
+  renew = asyncHandler(async (req, res) => {
+    const renewed = await leaseService.renewLease(req.params.id, req.body, req.user);
+    res.status(200).json(
+      new ApiResponse(200, renewed, 'Lease renewed successfully with escalation')
+    );
+  });
+
+  terminate = asyncHandler(async (req, res) => {
+    const terminated = await leaseService.terminateLease(req.params.id, req.body, req.user);
+    res.status(200).json(
+      new ApiResponse(200, terminated, 'Lease terminated successfully')
+    );
+  });
 }
 
 export const leaseController = new LeaseController();
