@@ -30,8 +30,8 @@ export const checkPlanQuota = (quotaType) =>
       throw new ApiError(401, 'Authentication required');
     }
 
-    // Platform SuperAdmin bypasses operational quotas for system testing
-    if (user.isSuperAdmin || user.mobile === '9876543210') {
+    // Platform SuperAdmin bypasses operational quotas for system administration
+    if (user.isSuperAdmin || Boolean(user.adminRole)) {
       return next();
     }
 

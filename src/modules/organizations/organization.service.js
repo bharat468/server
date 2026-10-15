@@ -91,8 +91,15 @@ export class OrganizationService {
     });
 
     if (orgs.length === 0 && userId) {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (user) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { tenantLeases: { where: { status: 'ACTIVE' } } },
+      });
+
+      const isTenant = user?.tenantLeases && user.tenantLeases.length > 0;
+      const isPlatformAdmin = Boolean(user?.isSuperAdmin || user?.adminRole);
+
+      if (user && !isTenant && !isPlatformAdmin) {
         const baseSlug = (user.name || 'workspace').toLowerCase().replace(/[^a-z0-9]/g, '-');
         const slug = `${baseSlug || 'workspace'}-${Date.now().toString(36)}`;
         const newOrg = await this.createOrganization({

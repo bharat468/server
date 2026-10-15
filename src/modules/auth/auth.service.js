@@ -243,21 +243,8 @@ export class AuthService {
       );
     }
 
-    // Fetch user roles and organizations
-    const fullUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        userRoles: { include: { role: true, organization: true } },
-      },
-    });
-
-    const isSuperAdmin =
-      Boolean(user.isSuperAdmin) ||
-      user.adminRole === 'SUPER_ADMIN';
-
-    const roleName = isSuperAdmin
-      ? 'Platform SuperAdministrator'
-      : fullUser?.userRoles?.[0]?.role?.name || 'Landlord';
+    const { roleName, organizationName, organizationId, isSuperAdmin } =
+      await this.resolveUserProfile(user);
 
     const { accessToken, refreshToken } = this.generateTokens(user, {
       role: roleName,
@@ -265,7 +252,7 @@ export class AuthService {
       adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
     });
 
-    const { permissions, platformPermissions } = await this.calculateUserPermissions(user.id);
+    const { permissions, platformPermissions } = await this.calculateUserPermissions(user.id, organizationId);
 
     return {
       user: {
@@ -275,6 +262,8 @@ export class AuthService {
         email: user.email,
         status: user.status,
         role: roleName,
+        organizationName,
+        organizationId,
         isSuperAdmin,
         adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
         permissions,
@@ -386,25 +375,8 @@ export class AuthService {
       throw new ApiError(403, 'Invalid token type: Refresh token required');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: {
-        userRoles: { include: { role: true, organization: true } },
-      },
-    });
-
-    if (!user || user.status === 'SUSPENDED' || user.status === 'INACTIVE') {
-      throw new ApiError(403, `User account is ${user?.status ? user.status.toLowerCase() : 'not found'}`);
-    }
-
-    const isSuperAdmin =
-      Boolean(user.isSuperAdmin) ||
-      user.adminRole === 'SUPER_ADMIN' ||
-      user.mobile === '9876543210';
-
-    const roleName = isSuperAdmin
-      ? 'Platform SuperAdministrator'
-      : user.userRoles?.[0]?.role?.name || 'Landlord';
+    const { roleName, organizationName, organizationId, isSuperAdmin } =
+      await this.resolveUserProfile(user);
 
     const { accessToken, refreshToken: newRefreshToken } = this.generateTokens(user, {
       role: roleName,
@@ -412,7 +384,7 @@ export class AuthService {
       adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
     });
 
-    const { permissions, platformPermissions } = await this.calculateUserPermissions(user.id);
+    const { permissions, platformPermissions } = await this.calculateUserPermissions(user.id, organizationId);
 
     return {
       accessToken,
@@ -425,12 +397,58 @@ export class AuthService {
         email: user.email,
         status: user.status,
         role: roleName,
+        organizationName,
+        organizationId,
         isSuperAdmin,
         adminRole: user.adminRole || (isSuperAdmin ? 'SUPER_ADMIN' : null),
         permissions,
         platformPermissions,
         createdAt: user.createdAt,
       },
+    };
+  }
+
+  async resolveUserProfile(user) {
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        ownedOrganizations: true,
+        organizationMembers: { include: { organization: true } },
+        userRoles: { include: { role: true, organization: true } },
+        tenantLeases: { where: { status: 'ACTIVE' }, include: { property: true } },
+      },
+    });
+
+    const isSuperAdmin = Boolean(user.isSuperAdmin || user.adminRole === 'SUPER_ADMIN');
+
+    let roleName = 'Landlord';
+    let organizationName = null;
+    let organizationId = null;
+
+    if (isSuperAdmin) {
+      roleName = 'Platform SuperAdministrator';
+    } else if (fullUser?.ownedOrganizations?.length > 0) {
+      roleName = 'Owner';
+      organizationName = fullUser.ownedOrganizations[0].name;
+      organizationId = fullUser.ownedOrganizations[0].id;
+    } else if (fullUser?.userRoles?.length > 0) {
+      roleName = fullUser.userRoles[0].role?.name || 'Staff';
+      organizationName = fullUser.userRoles[0].organization?.name || null;
+      organizationId = fullUser.userRoles[0].organizationId || null;
+    } else if (fullUser?.organizationMembers?.length > 0) {
+      roleName = fullUser.organizationMembers[0].role === 'OWNER' ? 'Owner' : 'Staff';
+      organizationName = fullUser.organizationMembers[0].organization?.name || null;
+      organizationId = fullUser.organizationMembers[0].organizationId || null;
+    } else if (fullUser?.tenantLeases?.length > 0) {
+      roleName = 'Tenant';
+      organizationName = fullUser.tenantLeases[0].property?.name || 'Rental Tenant';
+    }
+
+    return {
+      roleName,
+      organizationName,
+      organizationId,
+      isSuperAdmin,
     };
   }
 
