@@ -375,6 +375,15 @@ export class AuthService {
       throw new ApiError(403, 'Invalid token type: Refresh token required');
     }
 
+    const user = await this.userRepo.findById(decoded.id);
+    if (!user) {
+      throw new ApiError(401, 'User account associated with this token no longer exists');
+    }
+
+    if (user.status === 'SUSPENDED') {
+      throw new ApiError(403, 'Access Denied: Your account has been suspended.');
+    }
+
     const { roleName, organizationName, organizationId, isSuperAdmin } =
       await this.resolveUserProfile(user);
 
