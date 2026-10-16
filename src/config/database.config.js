@@ -9,6 +9,7 @@ export async function connectDatabase() {
   try {
     await prisma.$connect();
     await initSystemSettingsTable();
+    await initSupportMessagesTable();
     logger.info('DB connected & system settings verified');
   } catch (error) {
     logger.error({ err: error }, 'Failed to connect to the database');
@@ -80,6 +81,33 @@ async function initSystemSettingsTable() {
     }
   } catch (err) {
     logger.warn({ err }, 'System settings table initialization handled');
+  }
+}
+
+export async function initSupportMessagesTable() {
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "support_messages" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "senderName" TEXT NOT NULL,
+        "senderEmail" TEXT,
+        "senderPhone" TEXT NOT NULL,
+        "userId" TEXT,
+        "userRole" TEXT,
+        "organizationId" TEXT,
+        "organizationName" TEXT,
+        "subject" TEXT NOT NULL,
+        "message" TEXT NOT NULL,
+        "category" TEXT NOT NULL DEFAULT 'GENERAL_INQUIRY',
+        "status" TEXT NOT NULL DEFAULT 'UNREAD',
+        "priority" TEXT NOT NULL DEFAULT 'MEDIUM',
+        "replies" TEXT NOT NULL DEFAULT '[]',
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (err) {
+    logger.warn({ err }, 'Support messages table initialization handled');
   }
 }
 
