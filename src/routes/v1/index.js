@@ -14,6 +14,7 @@ import applicationRouter from '../../modules/applications/application.routes.js'
 import leaseRouter from '../../modules/leases/lease.routes.js';
 import maintenanceRouter from '../../modules/maintenance/maintenance.routes.js';
 import reportsRouter from '../../modules/reports/reports.routes.js';
+import messageRouter from '../../modules/messages/message.routes.js';
 
 const router = Router();
 
@@ -76,5 +77,8 @@ router.use('/plans', planRouter);
 
 // Exportable Financial & Operational Reports (/api/v1/reports)
 router.use('/reports', reportsRouter);
+
+// Support Messages, Inquiries & Helpdesk (/api/v1/messages)
+router.use('/messages', messageRouter);
 
 export default router;
