@@ -2,6 +2,16 @@ import { Router } from 'express';
 import { adminController } from './admin.controller.js';
 import { authenticate } from '../../common/middleware/auth.middleware.js';
 import { requireAdmin, requirePlatformPermission } from '../../common/guards/admin.guard.js';
+import { validateRequest } from '../../common/validators/request.validator.js';
+import {
+  adminCreateUserSchema,
+  adminUpdateUserSchema,
+  adminCreateRoleSchema,
+  adminCreateSettingSchema,
+} from '../../common/validators/admin.validator.js';
+import {
+  createOrganizationSchema,
+} from '../../common/validators/organization.validator.js';
 
 const router = Router();
 
@@ -22,11 +32,13 @@ router.get(
 router.post(
   '/users',
   requirePlatformPermission('PLATFORM_MANAGE_USERS'),
+  validateRequest(adminCreateUserSchema),
   adminController.createUser
 );
 router.put(
   '/users/:id',
   requirePlatformPermission('PLATFORM_MANAGE_USERS'),
+  validateRequest(adminUpdateUserSchema),
   adminController.updateUser
 );
 router.delete(
@@ -59,6 +71,7 @@ router.get(
 router.post(
   '/roles',
   requirePlatformPermission('PLATFORM_MANAGE_ADMIN_ROLES'),
+  validateRequest(adminCreateRoleSchema),
   adminController.createSuperAdminRole
 );
 router.put(
@@ -81,6 +94,7 @@ router.get(
 router.post(
   '/organizations',
   requirePlatformPermission('PLATFORM_MANAGE_ORGANIZATIONS'),
+  validateRequest(createOrganizationSchema),
   adminController.createOrganization
 );
 router.put(
@@ -108,6 +122,7 @@ router.get(
 router.post(
   '/settings',
   requirePlatformPermission('PLATFORM_MANAGE_BILLING'),
+  validateRequest(adminCreateSettingSchema),
   adminController.createSetting
 );
 router.put(

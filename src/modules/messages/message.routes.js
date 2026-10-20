@@ -4,6 +4,12 @@ import { authenticate } from '../../common/middleware/auth.middleware.js';
 import { requireAdmin } from '../../common/guards/admin.guard.js';
 import { authService } from '../auth/auth.service.js';
 import { userRepository } from '../users/user.repository.js';
+import { validateRequest } from '../../common/validators/request.validator.js';
+import {
+  submitMessageSchema,
+  replyMessageSchema,
+  updateMessageStatusSchema,
+} from '../../common/validators/message.validator.js';
 
 const router = Router();
 
@@ -36,7 +42,7 @@ const optionalAuthenticate = async (req, _res, next) => {
 // ============================================================
 // 1. PUBLIC / GENERAL USER INQUIRY SUBMISSION
 // ============================================================
-router.post('/', optionalAuthenticate, messageController.submitMessage);
+router.post('/', optionalAuthenticate, validateRequest(submitMessageSchema), messageController.submitMessage);
 
 // ============================================================
 // 2. USER SUPPORT HISTORY (My Messages)
@@ -49,8 +55,8 @@ router.get('/my', authenticate, messageController.getMyMessages);
 router.get('/metrics', authenticate, requireAdmin, messageController.getMetrics);
 router.get('/', authenticate, requireAdmin, messageController.listMessages);
 router.get('/:id', authenticate, requireAdmin, messageController.getMessage);
-router.post('/:id/reply', authenticate, requireAdmin, messageController.replyMessage);
-router.patch('/:id/status', authenticate, requireAdmin, messageController.updateStatus);
+router.post('/:id/reply', authenticate, requireAdmin, validateRequest(replyMessageSchema), messageController.replyMessage);
+router.patch('/:id/status', authenticate, requireAdmin, validateRequest(updateMessageStatusSchema), messageController.updateStatus);
 router.delete('/:id', authenticate, requireAdmin, messageController.deleteMessage);
 
 export default router;

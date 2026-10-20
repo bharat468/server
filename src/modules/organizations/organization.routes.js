@@ -3,6 +3,13 @@ import { organizationController } from './organization.controller.js';
 import { authenticate } from '../../common/middleware/auth.middleware.js';
 import { requirePermission } from '../../common/guards/rbac.guard.js';
 import { checkPlanQuota } from '../../common/guards/plan.guard.js';
+import { validateRequest } from '../../common/validators/request.validator.js';
+import {
+  createOrganizationSchema,
+  addMemberSchema,
+  updateMemberSchema,
+  updateUtilityRatesSchema,
+} from '../../common/validators/organization.validator.js';
 
 const router = Router();
 
@@ -10,7 +17,7 @@ const router = Router();
 router.use(authenticate);
 
 // Create and List Organizations
-router.post('/', organizationController.create);
+router.post('/', validateRequest(createOrganizationSchema), organizationController.create);
 router.get('/', organizationController.list);
 router.get('/:id', organizationController.getDetails);
 
@@ -24,12 +31,14 @@ router.post(
   '/:organizationId/members',
   requirePermission('role.assign'),
   checkPlanQuota('staff'),
+  validateRequest(addMemberSchema),
   organizationController.addMember
 );
 
 router.put(
   '/:organizationId/members/:userId',
   requirePermission('role.assign'),
+  validateRequest(updateMemberSchema),
   organizationController.updateMember
 );
 
@@ -47,6 +56,7 @@ router.post(
 
 router.patch(
   '/:id/utility-rates',
+  validateRequest(updateUtilityRatesSchema),
   organizationController.updateUtilityRates
 );
 
