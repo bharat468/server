@@ -54,9 +54,9 @@ Project/
 │   │   └── seed.js        # Automated dummy/mock data generator script
 │   ├── src/
 │   │   ├── modules/       # Auth, properties, units, tenants, leases, payments, admin, cron
-│   │   ├── common/        # Guards (admin.guard, plan.guard), middlewares, logger
+│   │   ├── common/        # Validators (Zod request schemas), Guards (admin.guard, plan.guard), logger
 │   │   └── server.js      # Express server entry point
-│   ├── tests/             # 11 Jest test suites (96 tests covering all edge cases)
+│   ├── tests/             # 12 Jest test suites (105 tests covering all validation, security, and lifecycle edge cases)
 │   ├── scripts/           # Full system diagnostic runner (test_full_system.js)
 │   ├── package.json
 │   └── .env
